@@ -12,6 +12,8 @@ type torrentFile struct {
 	pieces       string
 	pieceLength  int
 
+	singleFile bool
+
 	//used in single file only, it is the single file's length
 	length       int 
 
@@ -47,7 +49,7 @@ func BtoTorrent(file_bytes io.Reader) (torrentFile) {
 	if _, ok := bencodeInfo["files"]; ok {
 		//multiple files
 
-		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, name:name}
+		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, name:name, singleFile: false}
 		for _, element := range bencodeInfo["files"].([]interface{}) {
 			file_dict := element.(map[string]interface{})
 			temp_length := int(file_dict["length"].(int64))
@@ -67,18 +69,18 @@ func BtoTorrent(file_bytes io.Reader) (torrentFile) {
 	} else {
 		//single file
 		length := int(bencodeInfo["length"].(int64))
-		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, length:length, name:name}
+		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, length:length, name:name, singleFile: true}
 	}
 
 	return torrent
 }
 
 func main() {
-//	file, err := os.Open("netrunner-desktop-2101-64bit.iso.torrent")
-	file, err := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
+	file, err := os.Open("netrunner-desktop-2101-64bit.iso.torrent")
+//	file, err := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
 	check(err)
 
 	torrent := BtoTorrent(file)
 
-	fmt.Printf("%v", torrent.files)
+	fmt.Printf("%v", torrent.singleFile)
 }
