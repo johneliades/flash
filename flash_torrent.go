@@ -9,7 +9,7 @@ import (
 
 type torrentFile struct {
 	announce     string
-	pieces       string
+	pieces       [][20]byte
 	pieceLength  int
 
 	singleFile bool
@@ -34,21 +34,30 @@ func check(e error) {
 	}
 }
 
-func BtoTorrent(file_bytes io.Reader) (torrentFile) {
+func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 	data, err := bencode.Decode(file_bytes)
 	check(err)
 
 	announce := data["announce"].(string)
 
 	bencodeInfo := data["info"].(map[string]interface{})
-	pieces := bencodeInfo["pieces"].(string)
+	pieceStr := bencodeInfo["pieces"].(string)
 	pieceLength := int(bencodeInfo["piece length"].(int64))
 	name := bencodeInfo["name"].(string)
+
+
+	//split string of hashes in [][20]byte
+	pieces := [][20]byte{}
+	var l, r int
+	var temp [20]byte
+	for l, r = 0, 20; r <= len(pieceStr); l, r = r, r+20 {
+		copy(temp[:], pieceStr[l:r])
+		pieces = append(pieces, [20]byte(temp))
+	}
 
 	torrent := torrentFile{}
 	if _, ok := bencodeInfo["files"]; ok {
 		//multiple files
-
 		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, name:name, singleFile: false}
 		for _, element := range bencodeInfo["files"].([]interface{}) {
 			file_dict := element.(map[string]interface{})
@@ -80,7 +89,7 @@ func main() {
 //	file, err := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
 	check(err)
 
-	torrent := BtoTorrent(file)
+	torrent := BtoTorrentStruct(file)
 
-	fmt.Printf("%v", torrent.singleFile)
+	fmt.Printf("%v", len(torrent.pieces))
 }
