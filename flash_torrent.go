@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"crypto/sha1"
 	"github.com/marksamman/bencode"
 )
 
 type torrentFile struct {
 	announce     string
+	hash         [20]byte
 	pieces       [][20]byte
 	pieceLength  int
 
@@ -45,6 +47,9 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 	pieceLength := int(bencodeInfo["piece length"].(int64))
 	name := bencodeInfo["name"].(string)
 
+	//sha1 hash of bencoded info
+	buf := bencode.Encode(bencodeInfo)
+	hash := sha1.Sum(buf)
 
 	//split string of hashes in [][20]byte
 	pieces := [][20]byte{}
@@ -55,13 +60,23 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 		pieces = append(pieces, [20]byte(temp))
 	}
 
+	//common fields
 	torrent := torrentFile{}
+	torrent = torrentFile{
+		announce:announce, 
+		hash:hash,
+		pieces:pieces, 
+		pieceLength:pieceLength, 
+		name:name, 
+	}
+
 	if _, ok := bencodeInfo["files"]; ok {
 		//multiple files
-		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, name:name, singleFile: false}
+		
+		torrent.singleFile = false
+
 		for _, element := range bencodeInfo["files"].([]interface{}) {
 			file_dict := element.(map[string]interface{})
-			temp_length := int(file_dict["length"].(int64))
 			var temp_path []string
 			for _, path := range file_dict["path"].([]interface{}) {
 				temp_path = append(temp_path, path.(string))
@@ -71,25 +86,25 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 					length    int
 					path      []string
 				}{
-					temp_length,
+					int(file_dict["length"].(int64)),
 					temp_path,
 				})
 		}		
 	} else {
 		//single file
-		length := int(bencodeInfo["length"].(int64))
-		torrent = torrentFile{announce:announce, pieces:pieces, pieceLength:pieceLength, length:length, name:name, singleFile: true}
+		torrent.length = int(bencodeInfo["length"].(int64))
+		torrent.singleFile = true
 	}
 
 	return torrent
 }
 
 func main() {
-	file, err := os.Open("netrunner-desktop-2101-64bit.iso.torrent")
-//	file, err := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
+//	file, err := os.Open("netrunner-desktop-2101-64bit.iso.torrent")
+	file, err := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
 	check(err)
 
 	torrent := BtoTorrentStruct(file)
 
-	fmt.Printf("%v", len(torrent.pieces))
+	fmt.Printf("%v", torrent.files)
 }
