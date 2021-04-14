@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"net/url"
+	"math/rand"    
+	"time"
+	"strconv"
+	"net/http"
 	"crypto/sha1"
 	"github.com/marksamman/bencode"
 )
 
 type torrentFile struct {
 	announce     string
-	hash         [20]byte
+	infoHash     [20]byte
 	pieces       [][20]byte
 	pieceLength  int
 
@@ -49,7 +54,7 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 
 	//sha1 hash of bencoded info
 	buf := bencode.Encode(bencodeInfo)
-	hash := sha1.Sum(buf)
+	infoHash := sha1.Sum(buf)
 
 	//split string of hashes in [][20]byte
 	pieces := [][20]byte{}
@@ -64,7 +69,7 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 	torrent := torrentFile{}
 	torrent = torrentFile{
 		announce:announce, 
-		hash:hash,
+		infoHash:infoHash,
 		pieces:pieces, 
 		pieceLength:pieceLength, 
 		name:name, 
@@ -99,12 +104,48 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 	return torrent
 }
 
-func main() {
-//	file, err := os.Open("netrunner-desktop-2101-64bit.iso.torrent")
-	file, err := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
+func (torrent *torrentFile) getTrackerResponse(port int) (string, error) {
+	// create tracker url
+
+	base, err := url.Parse(torrent.announce)
 	check(err)
 
-	torrent := BtoTorrentStruct(file)
+	rand.Seed(time.Now().UnixNano())
+	var peerID [4]byte
+	_, err = rand.Read(peerID[:])
 
-	fmt.Printf("%v", torrent.files)
+	params := url.Values{}
+	params.Add("info_hash", string(torrent.infoHash[:]))
+	// peer_id must be 20 bytes
+	params.Add("peer_id", "git:johneliades-" + string(peerID[:]))
+	params.Add("port", strconv.Itoa(port))
+	params.Add("uploaded", "0")
+	params.Add("downloaded", "0")
+	params.Add("left", strconv.Itoa(torrent.length))
+	params.Add("compact", "1")
+
+	base.RawQuery = params.Encode()
+
+	// communicate with tracker url
+
+	resp, err := http.Get(base.String())
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+
+	return string(body[:]), nil
+}
+
+func main() {
+	file, ok := os.Open("netrunner-desktop-2101-64bit.iso.torrent")
+//	file, ok := os.Open("AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
+	check(ok)
+
+	torrent := BtoTorrentStruct(file)
+	trackerResponse, ok := torrent.getTrackerResponse(5)
+	check(ok)
+
+	fmt.Printf("%v", trackerResponse)	
 }
