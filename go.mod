@@ -1,4 +1,4 @@
-module flash_torrent
+module github.com/johneliades/flash_torrent
 
 go 1.16
 
