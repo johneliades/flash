@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"flash_torrent/torrent_decode"
+	"github.com/johneliades/flash_torrent/torrent_decode"
 )
 
 func check(e error) {
