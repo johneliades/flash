@@ -3,25 +3,25 @@ package torrent_decode
 import (
 	"fmt"
 	"io"
+	"math/rand"
+	"net/http"
 	"net/url"
-	"math/rand"    
-	"time"
 	"strconv"
 	"strings"
-	"net/http"
+	"time"
 )
 
-func (torrent *torrentFile) GetTrackerResponse(port int) (string) {
-	if(strings.HasPrefix(torrent.announce, "http")) {
+func (torrent *torrentFile) GetTrackerResponse(port int) string {
+	if strings.HasPrefix(torrent.announce, "http") {
 		return getHTTPTrackerResponse(torrent, port)
-	} else if(strings.HasPrefix(torrent.announce, "udp")) {
-		fmt.Printf("UDP tracker not supported yet.")	
+	} else if strings.HasPrefix(torrent.announce, "udp") {
+		fmt.Printf("UDP tracker not supported yet.")
 	}
 
 	return ""
 }
 
-func getHTTPTrackerResponse(torrent *torrentFile, port int) (string) {
+func getHTTPTrackerResponse(torrent *torrentFile, port int) string {
 	// create tracker url
 
 	base, ok := url.Parse(torrent.announce)
@@ -35,7 +35,7 @@ func getHTTPTrackerResponse(torrent *torrentFile, port int) (string) {
 	params := url.Values{}
 	params.Add("info_hash", string(torrent.infoHash[:]))
 	// peer_id must be 20 bytes
-	params.Add("peer_id", "git:johneliades-" + string(peerID[:]))
+	params.Add("peer_id", "git:johneliades-"+string(peerID[:]))
 	params.Add("port", strconv.Itoa(port))
 	params.Add("uploaded", "0")
 	params.Add("downloaded", "0")

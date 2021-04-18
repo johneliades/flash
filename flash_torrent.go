@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"github.com/johneliades/flash_torrent/torrent_decode"
+	"os"
 )
 
 func check(e error) {
@@ -14,7 +14,7 @@ func check(e error) {
 
 func main() {
 	file, ok := os.Open("torrents/netrunner-desktop-2101-64bit.iso.torrent")
-//	file, ok := os.Open("torrents/AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
+	//	file, ok := os.Open("torrents/AFC634F60782AE4EA51D2BBFF506479F613CF761.torrent")
 	check(ok)
 
 	torrent := torrent_decode.BtoTorrentStruct(file)

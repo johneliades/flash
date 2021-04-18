@@ -1,30 +1,30 @@
 package torrent_decode
 
 import (
-	"io"
 	"crypto/sha1"
 	"github.com/marksamman/bencode"
+	"io"
 )
 
 type torrentFile struct {
-	announce     string
-	infoHash     [20]byte
-	pieces       [][20]byte
-	pieceLength  int
+	announce    string
+	infoHash    [20]byte
+	pieces      [][20]byte
+	pieceLength int
 
 	singleFile bool
 
 	//used in single file only, it is the single file's length
-	length       int 
+	length int
 
 	// when torrent has a single file this is the file name
 	// when multiple files this is the directory
-	name         string 
+	name string
 
 	//list of file lengths and paths, used only when multiple files
-	files []struct { 
-		length    int
-		path      []string
+	files []struct {
+		length int
+		path   []string
 	}
 }
 
@@ -34,7 +34,7 @@ func check(e error) {
 	}
 }
 
-func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
+func BtoTorrentStruct(file_bytes io.Reader) torrentFile {
 	data, err := bencode.Decode(file_bytes)
 	check(err)
 
@@ -61,16 +61,16 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 	//common fields
 	torrent := torrentFile{}
 	torrent = torrentFile{
-		announce:announce, 
-		infoHash:infoHash,
-		pieces:pieces, 
-		pieceLength:pieceLength, 
-		name:name, 
+		announce:    announce,
+		infoHash:    infoHash,
+		pieces:      pieces,
+		pieceLength: pieceLength,
+		name:        name,
 	}
 
 	if _, ok := bencodeInfo["files"]; ok {
 		//multiple files
-		
+
 		torrent.singleFile = false
 
 		for _, element := range bencodeInfo["files"].([]interface{}) {
@@ -81,13 +81,13 @@ func BtoTorrentStruct(file_bytes io.Reader) (torrentFile) {
 			}
 
 			torrent.files = append(torrent.files, struct {
-					length    int
-					path      []string
-				}{
-					int(file_dict["length"].(int64)),
-					temp_path,
-				})
-		}		
+				length int
+				path   []string
+			}{
+				int(file_dict["length"].(int64)),
+				temp_path,
+			})
+		}
 	} else {
 		//single file
 		torrent.length = int(bencodeInfo["length"].(int64))
