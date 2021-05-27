@@ -1,9 +1,11 @@
-package torrent_decode
+package torrent_file
 
 import (
 	"crypto/sha1"
-	"github.com/marksamman/bencode"
 	"io"
+	"os"
+	"fmt"
+	"github.com/marksamman/bencode"
 )
 
 type torrentFile struct {
@@ -34,7 +36,7 @@ func check(e error) {
 	}
 }
 
-func BtoTorrentStruct(file_bytes io.Reader) torrentFile {
+func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	data, err := bencode.Decode(file_bytes)
 	check(err)
 
@@ -95,4 +97,13 @@ func BtoTorrentStruct(file_bytes io.Reader) torrentFile {
 	}
 
 	return torrent
+}
+
+func Open(path string) {
+	file, ok := os.Open(path)
+	check(ok)
+
+	torrent := btoTorrentStruct(file)
+	peers := torrent.GetPeers(3000)
+	fmt.Printf("%v", peers)
 }
