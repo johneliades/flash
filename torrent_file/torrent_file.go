@@ -1,11 +1,19 @@
 package torrent_file
 
 import (
-	"crypto/sha1"
 	"io"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+	"bytes"
+	"crypto/sha1"
 	"os"
 	"fmt"
 	"github.com/marksamman/bencode"
+	"github.com/johneliades/flash_torrent/peer"
 )
 
 type torrentFile struct {
@@ -99,11 +107,63 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	return torrent
 }
 
-func Open(path string) {
+func (torrent *torrentFile) GetPeers(port int) []peer.Peer {
+	var body []byte
+
+	if strings.HasPrefix(torrent.announce, "http") { 
+		// ============== HTTP Tracker ==============
+
+		base, ok := url.Parse(torrent.announce)
+		check(ok)
+
+		rand.Seed(time.Now().UnixNano())
+		var peerID [4]byte
+		_, ok = rand.Read(peerID[:])
+		check(ok)
+
+		params := url.Values{}
+		params.Add("info_hash", string(torrent.infoHash[:]))
+		// peer_id must be 20 bytes
+		params.Add("peer_id", "git:johneliades-"+string(peerID[:]))
+		params.Add("port", strconv.Itoa(port))
+		params.Add("uploaded", "0")
+		params.Add("downloaded", "0")
+		params.Add("left", strconv.Itoa(torrent.length))
+		params.Add("compact", "1")
+
+		base.RawQuery = params.Encode()
+
+		// communicate with tracker url
+
+		resp, ok := http.Get(base.String())
+		check(ok)
+
+		defer resp.Body.Close()
+
+		body, ok = io.ReadAll(resp.Body)
+		check(ok)
+	} else if strings.HasPrefix(torrent.announce, "udp") {
+		// ============== UDP Tracker ==============
+		panic("UDP tracker not supported yet.")
+	}
+
+	data, err := bencode.Decode(bytes.NewReader(body[:]))
+	check(err)
+
+	// in seconds, for connecting to the tracker again
+	//interval := data["interval"].(int64)
+
+	return peer.ExtractPeers([]byte(data["peers"].(string)))
+}
+
+func Open(path string) torrentFile {
 	file, ok := os.Open(path)
 	check(ok)
 
-	torrent := btoTorrentStruct(file)
+	return btoTorrentStruct(file)
+}
+
+func (torrent *torrentFile) Download(path string) {
 	peers := torrent.GetPeers(3000)
 	fmt.Printf("%v", peers)
 }
