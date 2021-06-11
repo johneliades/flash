@@ -1,20 +1,27 @@
 package torrent_file
 
 import (
+	"bytes"
+	"crypto/sha1"
+	"fmt"
+	"github.com/johneliades/flash_torrent/client"
+	"github.com/johneliades/flash_torrent/peer"
+	"github.com/marksamman/bencode"
 	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
-	"bytes"
-	"crypto/sha1"
-	"os"
-	"fmt"
-	"github.com/marksamman/bencode"
-	"github.com/johneliades/flash_torrent/peer"
 )
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
 
 type torrentFile struct {
 	announce    string
@@ -35,12 +42,6 @@ type torrentFile struct {
 	files []struct {
 		length int
 		path   []string
-	}
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
 	}
 }
 
@@ -107,24 +108,19 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	return torrent
 }
 
-func (torrent *torrentFile) GetPeers(port int) []peer.Peer {
+func (torrent *torrentFile) getPeers(peerID string, port int) []peer.Peer {
 	var body []byte
 
-	if strings.HasPrefix(torrent.announce, "http") { 
+	if strings.HasPrefix(torrent.announce, "http") {
 		// ============== HTTP Tracker ==============
 
 		base, ok := url.Parse(torrent.announce)
 		check(ok)
 
-		rand.Seed(time.Now().UnixNano())
-		var peerID [4]byte
-		_, ok = rand.Read(peerID[:])
-		check(ok)
-
 		params := url.Values{}
 		params.Add("info_hash", string(torrent.infoHash[:]))
 		// peer_id must be 20 bytes
-		params.Add("peer_id", "git:johneliades-"+string(peerID[:]))
+		params.Add("peer_id", peerID)
 		params.Add("port", strconv.Itoa(port))
 		params.Add("uploaded", "0")
 		params.Add("downloaded", "0")
@@ -153,7 +149,7 @@ func (torrent *torrentFile) GetPeers(port int) []peer.Peer {
 	// in seconds, for connecting to the tracker again
 	//interval := data["interval"].(int64)
 
-	return peer.ExtractPeers([]byte(data["peers"].(string)))
+	return peer.Deserialize([]byte(data["peers"].(string)))
 }
 
 func Open(path string) torrentFile {
@@ -164,6 +160,18 @@ func Open(path string) torrentFile {
 }
 
 func (torrent *torrentFile) Download(path string) {
-	peers := torrent.GetPeers(3000)
+	rand.Seed(time.Now().UnixNano())
+
+	var peerID [20]byte
+	_, ok := rand.Read(peerID[:])
+	check(ok)
+
+	//	peer_string := "git:johneliades-" + string(peerID[:])
+
+	peers := torrent.getPeers(string(peerID[:]), 3000)
+
+	_, ok = client.New(peers[0], peerID, torrent.infoHash)
+	check(ok)
+
 	fmt.Printf("%v", peers)
 }
