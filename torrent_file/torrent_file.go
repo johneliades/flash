@@ -3,12 +3,14 @@ package torrent_file
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
 	"github.com/johneliades/flash_torrent/client"
 	"github.com/johneliades/flash_torrent/peer"
 	"github.com/marksamman/bencode"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -140,7 +142,35 @@ func (torrent *torrentFile) getPeers(peerID string, port int) []peer.Peer {
 		check(ok)
 	} else if strings.HasPrefix(torrent.announce, "udp") {
 		// ============== UDP Tracker ==============
-		panic("UDP tracker not supported yet.")
+
+		conn, ok := net.Dial("udp", torrent.announce[len("udp://"):len(torrent.announce)-len("/announce")])
+		check(ok)
+
+		b1 := make([]byte, 8)
+		b2 := make([]byte, 4)
+		b3 := make([]byte, 4)
+
+		binary.BigEndian.PutUint64(b1, uint64(0x41727101980))
+		binary.BigEndian.PutUint32(b2, uint32(0))
+		binary.BigEndian.PutUint32(b3, uint32(10000))
+
+		buf := []byte{}
+		buf = append(buf, b1...)
+		buf = append(buf, b2...)
+		buf = append(buf, b3...)
+
+		_, ok = conn.Write(buf)
+		check(ok)
+
+		//receiver
+		var action int64
+		ok = binary.Read(conn, binary.BigEndian, &action)
+		check(ok)
+	
+		print("\n")
+		print(action)
+		print("\n")
+	//	panic("UDP tracker not supported yet.")
 	}
 
 	data, err := bencode.Decode(bytes.NewReader(body[:]))
