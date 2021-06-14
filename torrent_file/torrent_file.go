@@ -27,6 +27,7 @@ func check(e error) {
 
 type torrentFile struct {
 	announce    string
+	announceList []string
 	infoHash    [20]byte
 	pieces      [][20]byte
 	pieceLength int
@@ -53,6 +54,11 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 
 	announce := data["announce"].(string)
 
+	var announceList []string
+	for _, tracker := range data["announce-list"].([]interface{}) {
+		announceList = append(announceList, tracker.([]interface{})[0].(string))
+	}
+
 	bencodeInfo := data["info"].(map[string]interface{})
 	pieceStr := bencodeInfo["pieces"].(string)
 	pieceLength := int(bencodeInfo["piece length"].(int64))
@@ -75,6 +81,7 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	torrent := torrentFile{}
 	torrent = torrentFile{
 		announce:    announce,
+		announceList: announceList,
 		infoHash:    infoHash,
 		pieces:      pieces,
 		pieceLength: pieceLength,
@@ -163,7 +170,7 @@ func (torrent *torrentFile) getPeers(peerID string, port int) []peer.Peer {
 		check(ok)
 
 		//receiver
-		var action int64
+		var action int32
 		ok = binary.Read(conn, binary.BigEndian, &action)
 		check(ok)
 	
