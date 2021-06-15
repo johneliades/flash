@@ -5,12 +5,6 @@ import (
 	"io"
 )
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 type Handshake struct {
 	pstr     string
 	InfoHash [20]byte
@@ -38,7 +32,9 @@ func (handshake *Handshake) Serialize() []byte {
 func Read(reader io.Reader) (*Handshake, error) {
 	lengthBuf := make([]byte, 1)
 	_, ok := io.ReadFull(reader, lengthBuf)
-	check(ok)
+	if ok != nil {
+		return &Handshake{}, ok
+	}
 
 	pstrlen := int(lengthBuf[0])
 	if pstrlen == 0 {
@@ -47,7 +43,9 @@ func Read(reader io.Reader) (*Handshake, error) {
 
 	handshakeResponse := make([]byte, 48+pstrlen)
 	_, ok = io.ReadFull(reader, handshakeResponse)
-	check(ok)
+	if ok != nil {
+		return &Handshake{}, ok
+	}
 
 	var infoHash, peerID [20]byte
 	copy(infoHash[:], handshakeResponse[pstrlen+8:pstrlen+8+20])
