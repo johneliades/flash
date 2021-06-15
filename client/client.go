@@ -43,8 +43,8 @@ func New(peer peer.Peer, peerID, infoHash [20]byte) (*Client, error) {
 		return nil, fmt.Errorf("Expected infohash %x but got %x", res.InfoHash, infoHash)
 	}
 
-//	conn.SetDeadline(time.Now().Add(5 * time.Second))
-//	defer conn.SetDeadline(time.Time{})
+	//	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	//	defer conn.SetDeadline(time.Time{})
 
 	/*
 		msg, ok := message.Read(conn)

@@ -157,7 +157,7 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 
 		// in seconds, for connecting to the tracker again
 		//interval := data["interval"].(int64)
-		
+
 		return peer.Deserialize([]byte(data["peers"].(string))), nil
 	} else if strings.HasPrefix(tracker, "udp") {
 		// ============== UDP Tracker ==============
@@ -205,7 +205,7 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		transaction = rand.Uint32()
 		key := rand.Uint32()
 
-		buf = make([]byte, 98) 
+		buf = make([]byte, 98)
 		binary.BigEndian.PutUint64(buf, connection_id)
 		binary.BigEndian.PutUint32(buf[8:], uint32(1))
 		binary.BigEndian.PutUint32(buf[12:], uint32(transaction))
@@ -227,7 +227,7 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 
 		// Wrong cause it blocks if there are less than 10 clients
 		// and ignores the rest if there are more
-		buf_res = make([]byte, 20 + 10*6) // 20 header and 10 clients of 6 bytes each
+		buf_res = make([]byte, 20+10*6) // 20 header and 10 clients of 6 bytes each
 		ok = binary.Read(conn, binary.BigEndian, &buf_res)
 		if ok != nil {
 			return []peer.Peer{}, ok
@@ -260,15 +260,15 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 }
 
 func unique(intSlice []peer.Peer) []peer.Peer {
-    keys := make(map[string]bool)
-    list := []peer.Peer{}	
-    for _, entry := range intSlice {
-        if _, value := keys[entry.String()]; !value {
-            keys[entry.String()] = true
-            list = append(list, entry)
-        }
-    }    
-    return list
+	keys := make(map[string]bool)
+	list := []peer.Peer{}
+	for _, entry := range intSlice {
+		if _, value := keys[entry.String()]; !value {
+			keys[entry.String()] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
 
 func Open(path string) torrentFile {
