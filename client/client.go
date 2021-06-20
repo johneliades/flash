@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/johneliades/flash_torrent/handshake"
-	"github.com/johneliades/flash_torrent/peer"
 	"github.com/johneliades/flash_torrent/message"
+	"github.com/johneliades/flash_torrent/peer"
 	"net"
 	"time"
 )

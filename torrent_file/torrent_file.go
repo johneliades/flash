@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/johneliades/flash_torrent/client"
 	"github.com/johneliades/flash_torrent/peer"
+	//"github.com/johneliades/flash_torrent/torrent"
 	"github.com/marksamman/bencode"
 	"io"
 	"math/rand"
