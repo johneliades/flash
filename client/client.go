@@ -10,10 +10,35 @@ import (
 	"time"
 )
 
+// A Bitfield represents the pieces that a peer has
+type bitfield []byte
+
+// HasPiece tells if a bitfield has a particular index set
+func (bf bitfield) HasPiece(index int) bool {
+	byteIndex := index / 8
+	offset := index % 8
+	if byteIndex < 0 || byteIndex >= len(bf) {
+		return false
+	}
+	return bf[byteIndex]>>(7-offset)&1 != 0
+}
+
+// SetPiece sets a bit in the bitfield
+func (bf bitfield) SetPiece(index int) {
+	byteIndex := index / 8
+	offset := index % 8
+
+	// silently discard invalid bounded index
+	if byteIndex < 0 || byteIndex >= len(bf) {
+		return
+	}
+	bf[byteIndex] |= 1 << (7 - offset)
+}
+
 type Client struct {
 	conn     net.Conn
 	choked   bool
-	bitField []byte
+	bitField bitfield
 	peer     peer.Peer
 	infoHash [20]byte
 	peerID   [20]byte
