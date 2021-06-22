@@ -38,7 +38,7 @@ func (bf bitfield) SetPiece(index int) {
 type Client struct {
 	conn     net.Conn
 	choked   bool
-	bitField bitfield
+	BitField bitfield
 	peer     peer.Peer
 	infoHash [20]byte
 	peerID   [20]byte
@@ -84,7 +84,7 @@ func New(peer peer.Peer, peerID, infoHash [20]byte) (*Client, error) {
 	return &Client{
 		conn:     conn,
 		choked:   true,
-		bitField: msg.Payload,
+		BitField: msg.Payload,
 		peer:     peer,
 		infoHash: infoHash,
 		peerID:   peerID,

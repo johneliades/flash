@@ -5,9 +5,8 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
-	"github.com/johneliades/flash_torrent/client"
 	"github.com/johneliades/flash_torrent/peer"
-	//"github.com/johneliades/flash_torrent/torrent"
+	"github.com/johneliades/flash_torrent/torrent"
 	"github.com/marksamman/bencode"
 	"io"
 	"math/rand"
@@ -20,14 +19,24 @@ import (
 	"time"
 )
 
+const (
+	Reset  = "\033[0m"
+	Red    = "\033[31m"
+	Green  = "\033[32m"
+	Yellow = "\033[33m"
+	Blue   = "\033[34m"
+	Purple = "\033[35m"
+	Cyan   = "\033[36m"
+	Gray   = "\033[37m"
+	White  = "\033[97m"
+)
+
 type torrentFile struct {
 	announce     string
 	announceList []string
 	infoHash     [20]byte
-	pieces       [][20]byte
+	pieceHashes  [][20]byte
 	pieceLength  int
-
-	singleFile bool
 
 	//used in single file only, it is the single file's length
 	length int
@@ -37,10 +46,7 @@ type torrentFile struct {
 	name string
 
 	//list of file lengths and paths, used only when multiple files
-	files []struct {
-		length int
-		path   []string
-	}
+	files []torrent.File
 }
 
 func btoTorrentStruct(file_bytes io.Reader) torrentFile {
@@ -75,20 +81,18 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	}
 
 	//common fields
-	torrent := torrentFile{}
-	torrent = torrentFile{
+	t := torrentFile{}
+	t = torrentFile{
 		announce:     announce,
 		announceList: announceList,
 		infoHash:     infoHash,
-		pieces:       pieces,
+		pieceHashes:  pieces,
 		pieceLength:  pieceLength,
 		name:         name,
 	}
 
 	if _, ok := bencodeInfo["files"]; ok {
 		//multiple files
-
-		torrent.singleFile = false
 
 		for _, element := range bencodeInfo["files"].([]interface{}) {
 			file_dict := element.(map[string]interface{})
@@ -97,21 +101,17 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 				temp_path = append(temp_path, path.(string))
 			}
 
-			torrent.files = append(torrent.files, struct {
-				length int
-				path   []string
-			}{
+			t.files = append(t.files, torrent.File{
 				int(file_dict["length"].(int64)),
 				temp_path,
 			})
 		}
 	} else {
 		//single file
-		torrent.length = int(bencodeInfo["length"].(int64))
-		torrent.singleFile = true
+		t.length = int(bencodeInfo["length"].(int64))
 	}
 
-	return torrent
+	return t
 }
 
 func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([]peer.Peer, error) {
@@ -170,7 +170,7 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 			return []peer.Peer{}, ok
 		}
 
-		conn.SetDeadline(time.Now().Add(5 * time.Second))
+		conn.SetDeadline(time.Now().Add(2 * time.Second))
 		defer conn.SetDeadline(time.Time{})
 
 		transaction := rand.Uint32()
@@ -228,7 +228,7 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 
 		// Wrong cause it blocks if there are less than 10 clients
 		// and ignores the rest if there are more
-		buf_res = make([]byte, 20+10*6) // 20 header and 10 clients of 6 bytes each
+		buf_res = make([]byte, 20+15*6) // 20 header and 10 clients of 6 bytes each
 		ok = binary.Read(conn, binary.BigEndian, &buf_res)
 		if ok != nil {
 			return []peer.Peer{}, ok
@@ -272,22 +272,17 @@ func unique(intSlice []peer.Peer) []peer.Peer {
 	return list
 }
 
-func Open(path string) torrentFile {
-	file, ok := os.Open(path)
-	if ok != nil {
-		panic(ok)
+func Open(path string) (torrent.Torrent, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return torrent.Torrent{}, err
 	}
 
-	return btoTorrentStruct(file)
-}
-
-func (torrent *torrentFile) Download(path string) {
 	rand.Seed(time.Now().UnixNano())
-
 	var peerID [20]byte
-	_, ok := rand.Read(peerID[:])
-	if ok != nil {
-		panic(ok)
+	_, err = rand.Read(peerID[:])
+	if err != nil {
+		return torrent.Torrent{}, err
 	}
 
 	//	peer_string := "git:johneliades-" + string(peerID[:])
@@ -297,27 +292,34 @@ func (torrent *torrentFile) Download(path string) {
 	var tracker string
 	var peers []peer.Peer
 
-	for i := 0; i < len(torrent.announceList); i++ {
-		tracker = torrent.announceList[i]
+	t := btoTorrentStruct(file)
+	for i := 0; i < len(t.announceList); i++ {
+		tracker = t.announceList[i]
 		print("Trying tracker: " + tracker)
-		peers, ok = torrent.getPeers(tracker, string(peerID[:]), 3000)
-		if ok == nil {
-			print(" - Success\n")
+		peers, err = t.getPeers(tracker, string(peerID[:]), 3000)
+		if err == nil {
+			println(" - " + Green + "Success" + Reset)
 			break
+		} else {
+			println(" - " + Red + err.Error() + Reset)
 		}
-		print(" - " + ok.Error() + "\n")
 	}
 
 	peers = unique(peers)
 	fmt.Printf("\nFound peers: %v\n\n", peers)
 
-	for i := 0; i < len(peers); i++ {
-		print("Connecting: " + peers[i].String())
-		_, ok = client.New(peers[i], peerID, torrent.infoHash)
-		if ok == nil {
-			print(" - Success\n")
-		} else {
-			print(" - " + ok.Error() + "\n")
-		}
+	if len(peers) == 0 {
+		return torrent.Torrent{}, fmt.Errorf("No peers found")
 	}
+
+	return torrent.Torrent{
+		Peers:       peers,
+		PeerID:      peerID,
+		InfoHash:    t.infoHash,
+		PieceHashes: t.pieceHashes,
+		PieceLength: t.pieceLength,
+		Length:      t.length,
+		Name:        t.name,
+		Files:       t.files,
+	}, nil
 }
