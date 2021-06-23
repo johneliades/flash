@@ -2,18 +2,19 @@ package message
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
 const (
-	choke         uint8 = 0
-	unchoke       uint8 = 1
+	Choke         uint8 = 0
+	Unchoke       uint8 = 1
 	interested    uint8 = 2
 	notInterested uint8 = 3
-	have          uint8 = 4
+	Have          uint8 = 4
 	BitField      uint8 = 5
-	request       uint8 = 6
-	piece         uint8 = 7
+	Request       uint8 = 6
+	Piece         uint8 = 7
 	cancel        uint8 = 8
 )
 
@@ -61,4 +62,40 @@ func Read(reader io.Reader) (*Message, error) {
 		ID:      uint8(messageBuf[0]),
 		Payload: messageBuf[1:],
 	}, nil
+}
+
+// ParsePiece parses a PIECE message and copies its payload into a buffer
+func ParsePiece(index int, buf []byte, msg *Message) (int, error) {
+	if msg.ID != Piece {
+		return 0, fmt.Errorf("Expected PIECE (ID %d), got ID %d", Piece, msg.ID)
+	}
+	if len(msg.Payload) < 8 {
+		return 0, fmt.Errorf("Payload too short. %d < 8", len(msg.Payload))
+	}
+	parsedIndex := int(binary.BigEndian.Uint32(msg.Payload[0:4]))
+	if parsedIndex != index {
+		return 0, fmt.Errorf("Expected index %d, got %d", index, parsedIndex)
+	}
+	begin := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
+	if begin >= len(buf) {
+		return 0, fmt.Errorf("Begin offset too high. %d >= %d", begin, len(buf))
+	}
+	data := msg.Payload[8:]
+	if begin+len(data) > len(buf) {
+		return 0, fmt.Errorf("Data too long [%d] for offset %d with length %d", len(data), begin, len(buf))
+	}
+	copy(buf[begin:], data)
+	return len(data), nil
+}
+
+// ParseHave parses a HAVE message
+func ParseHave(msg *Message) (int, error) {
+	if msg.ID != Have {
+		return 0, fmt.Errorf("Expected HAVE (ID %d), got ID %d", Have, msg.ID)
+	}
+	if len(msg.Payload) != 4 {
+		return 0, fmt.Errorf("Expected payload length 4, got length %d", len(msg.Payload))
+	}
+	index := int(binary.BigEndian.Uint32(msg.Payload))
+	return index, nil
 }
