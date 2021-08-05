@@ -5,9 +5,9 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
-	"github.com/johneliades/flash_torrent/client"
-	"github.com/johneliades/flash_torrent/message"
-	"github.com/johneliades/flash_torrent/peer"
+	"github.com/johneliades/flash/client"
+	"github.com/johneliades/flash/message"
+	"github.com/johneliades/flash/peer"
 	"log"
 	"time"
 )
@@ -88,8 +88,7 @@ func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork,
 			return
 		}
 
-		_ = sha1.Sum(buf)
-		hash := pw.hash[:]
+		hash := sha1.Sum(buf)
 		if !bytes.Equal(hash[:], pw.hash[:]) {
 			fmt.Printf("Piece #%d failed integrity check\n", pw.index)
 			workQueue <- pw // Put piece back on the queue
@@ -189,6 +188,7 @@ func (torrent *Torrent) Download(path string) {
 		if end > torrent.Length {
 			end = torrent.Length
 		}
+		// Wrong for multiple files
 		workQueue <- &pieceWork{index, hash, end - begin}
 	}
 

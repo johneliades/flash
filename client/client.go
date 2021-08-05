@@ -3,9 +3,9 @@ package client
 import (
 	"bytes"
 	"fmt"
-	"github.com/johneliades/flash_torrent/handshake"
-	"github.com/johneliades/flash_torrent/message"
-	"github.com/johneliades/flash_torrent/peer"
+	"github.com/johneliades/flash/handshake"
+	"github.com/johneliades/flash/message"
+	"github.com/johneliades/flash/peer"
 	"net"
 	"time"
 )

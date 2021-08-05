@@ -5,8 +5,8 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
-	"github.com/johneliades/flash_torrent/peer"
-	"github.com/johneliades/flash_torrent/torrent"
+	"github.com/johneliades/flash/peer"
+	"github.com/johneliades/flash/torrent"
 	"github.com/marksamman/bencode"
 	"io"
 	"math/rand"
@@ -159,6 +159,7 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		// in seconds, for connecting to the tracker again
 		//interval := data["interval"].(int64)
 
+		// Wrong if peers are dictionary?
 		return peer.Deserialize([]byte(data["peers"].(string))), nil
 	} else if strings.HasPrefix(tracker, "udp") {
 		// ============== UDP Tracker ==============
