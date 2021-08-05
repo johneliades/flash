@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/johneliades/flash_torrent/torrent_file"
+	"github.com/johneliades/flash/torrent_file"
 )
 
 func check(e error) {
