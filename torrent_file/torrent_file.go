@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
+	"github.com/buger/goterm"
 	"github.com/johneliades/flash/peer"
 	"github.com/johneliades/flash/torrent"
 	"github.com/marksamman/bencode"
@@ -288,26 +289,37 @@ func Open(path string) (torrent.Torrent, error) {
 
 	//	peer_string := "git:johneliades-" + string(peerID[:])
 
-	print("\n")
-
 	var tracker string
 	var peers []peer.Peer
+
+	goterm.Clear() // Clear current screen
 
 	t := btoTorrentStruct(file)
 	for i := 0; i < len(t.announceList); i++ {
 		tracker = t.announceList[i]
-		print("Trying tracker: " + tracker)
+		goterm.MoveCursor(1, 1)
+		for i := 1; i < 300; i++ {
+			goterm.Print(" ")
+		}
+		goterm.MoveCursor(1, 1)
+
+		goterm.Print("Trying tracker: " + tracker)
+		goterm.Flush() // Call it every time at the end of rendering
 		peers, err = t.getPeers(tracker, string(peerID[:]), 3000)
 		if err == nil {
-			println(" - " + Green + "Success" + Reset)
+			goterm.Println(" - " + Green + "Success" + Reset)
+			goterm.Flush()
 			break
 		} else {
-			println(" - " + Red + err.Error() + Reset)
+			goterm.Println(" - " + Red + err.Error() + Reset)
+			goterm.Flush()
 		}
 	}
 
 	peers = unique(peers)
-	fmt.Printf("\nFound peers: %v\n\n", peers)
+	goterm.MoveCursor(1, 3)
+	goterm.Println(peers)
+	goterm.Flush()
 
 	if len(peers) == 0 {
 		return torrent.Torrent{}, fmt.Errorf("No peers found")
