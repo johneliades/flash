@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"fmt"
 	"github.com/buger/goterm"
 	"github.com/johneliades/flash/client"
 	"github.com/johneliades/flash/message"
@@ -102,6 +101,7 @@ func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork,
 		if !bytes.Equal(hash[:], pw.hash[:]) {
 			goterm.MoveCursor(1, 18)
 			goterm.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
+			goterm.Flush()
 			workQueue <- pw // Put piece back on the queue
 			continue
 		}
@@ -221,29 +221,35 @@ func (torrent *Torrent) Download(path string) {
 		go torrent.startDownload(peer, workQueue, results)
 	}
 
-	//buf := make([]byte, torrent.Length)
 	donePieces := 0
 
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
 
-		begin := res.index * torrent.PieceLength
-		end := begin + torrent.PieceLength
-		if end > torrent.Length {
-			end = torrent.Length
-		}
-		//copy(buf[begin:end], res.buf)
 		donePieces++
 
 		if len(torrent.Files) == 0 {
-			newPosition, err := file.Seek(int64(begin), 0)
+			newPosition, err := file.Seek(int64(res.index * torrent.PieceLength), 0)
+			if err != nil {
+				goterm.MoveCursor(1, 18)
+				goterm.Printf(Red+"%v"+Reset, err)
+				goterm.Flush()
+				return
+			}
 
-			goterm.MoveCursor(1, 18)
+			if(newPosition != int64(res.index * torrent.PieceLength)) {
+				goterm.MoveCursor(1, 18)
+				goterm.Println("WTF")
+				goterm.Flush()
+				return
+			}
+			
+			goterm.MoveCursor(1, 20)
 			goterm.Println("Just moved to: ", newPosition)
 			goterm.Flush()
 
-			_, err = fmt.Fprintf(file, string(res.buf))
-			if err != nil {
+			bytesWritten, err := file.Write(res.buf)
+			if err != nil || bytesWritten!=len(res.buf) {
 				goterm.MoveCursor(1, 18)
 				goterm.Printf(Red+"%v"+Reset, err)
 				goterm.Flush()
@@ -293,6 +299,8 @@ func (torrent *Torrent) Download(path string) {
 	for i := 0; i <= 25; i++ {
 		goterm.Print(" ")
 	}
+	
+	goterm.Flush()
 
 	close(workQueue)
 
