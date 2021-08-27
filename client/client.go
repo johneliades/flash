@@ -45,7 +45,7 @@ type Client struct {
 }
 
 func New(peer peer.Peer, peerID, infoHash [20]byte) (*Client, error) {
-	conn, ok := net.DialTimeout("tcp", peer.String(), 10*time.Second)
+	conn, ok := net.DialTimeout("tcp", peer.String(), 3*time.Second)
 	if ok != nil {
 		return &Client{}, ok
 	}
@@ -57,7 +57,7 @@ func New(peer peer.Peer, peerID, infoHash [20]byte) (*Client, error) {
 		return &Client{}, ok
 	}
 
-	conn.SetDeadline(time.Now().Add(10 * time.Second))
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
 	defer conn.SetDeadline(time.Time{})
 
 	res, ok := handshake.Read(conn)

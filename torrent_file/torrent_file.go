@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
-	"github.com/buger/goterm"
 	"github.com/johneliades/flash/peer"
 	"github.com/johneliades/flash/torrent"
 	"github.com/marksamman/bencode"
@@ -160,8 +159,11 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		// in seconds, for connecting to the tracker again
 		//interval := data["interval"].(int64)
 
-		// Wrong if peers are dictionary?
-		return peer.Deserialize([]byte(data["peers"].(string))), nil
+		val := data["peers"]
+		if val != nil {
+			// Wrong if peers are dictionary?
+			return peer.Deserialize([]byte(data["peers"].(string))), nil
+		}
 	} else if strings.HasPrefix(tracker, "udp") {
 		// ============== UDP Tracker ==============
 		// https://libtorrent.org/udp_tracker_protocol.html#authentication
@@ -292,34 +294,22 @@ func Open(path string) (torrent.Torrent, error) {
 	var tracker string
 	var peers []peer.Peer
 
-	goterm.Clear() // Clear current screen
-
 	t := btoTorrentStruct(file)
 	for i := 0; i < len(t.announceList); i++ {
 		tracker = t.announceList[i]
-		goterm.MoveCursor(1, 1)
-		for i := 1; i < 300; i++ {
-			goterm.Print(" ")
-		}
-		goterm.MoveCursor(1, 1)
 
-		goterm.Print("Trying tracker: " + tracker)
-		goterm.Flush() // Call it every time at the end of rendering
-		peers, err = t.getPeers(tracker, string(peerID[:]), 3000)
+		print("Trying tracker: " + tracker)
+		tempPeers, err := t.getPeers(tracker, string(peerID[:]), 3000)
 		if err == nil {
-			goterm.Println(" - " + Green + "Success" + Reset)
-			goterm.Flush()
-			break
+			peers = append(peers, tempPeers...)
+			println(" - " + Green + "Success" + Reset)
 		} else {
-			goterm.Println(" - " + Red + err.Error() + Reset)
-			goterm.Flush()
+			println(" - " + Red + err.Error() + Reset)
 		}
 	}
 
 	peers = unique(peers)
-	goterm.MoveCursor(1, 3)
-	goterm.Println(peers)
-	goterm.Flush()
+	println(peers)
 
 	if len(peers) == 0 {
 		return torrent.Torrent{}, fmt.Errorf("No peers found")

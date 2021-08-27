@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"github.com/buger/goterm"
+	"fmt"
 	"github.com/johneliades/flash/client"
 	"github.com/johneliades/flash/message"
 	"github.com/johneliades/flash/peer"
@@ -69,19 +69,11 @@ type pieceProgress struct {
 func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
 	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
 
-	goterm.MoveCursor(1, 9)
-	for i := 1; i < 300; i++ {
-		goterm.Print(" ")
-	}
-	goterm.MoveCursor(1, 9)
-	goterm.Flush()
-
 	if err == nil {
-		goterm.Println(peer.String() + " - " + Green + "Success" + Reset)
+		println(peer.String() + " - " + Green + "Success" + Reset)
 	} else {
-		goterm.Println(peer.String() + Red + " - " + err.Error() + Reset)
+		println(peer.String() + Red + " - " + err.Error() + Reset)
 	}
-	goterm.Flush()
 
 	for pw := range workQueue {
 		if !c.BitField.HasPiece(pw.index) {
@@ -91,17 +83,14 @@ func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork,
 
 		buf, err := attemptDownloadPiece(c, pw)
 		if err != nil {
-			goterm.MoveCursor(1, 18)
-			//goterm.Println(Red + "Exiting" + Reset, err)
+			//println(Red + "Exiting" + Reset, err)
 			workQueue <- pw // Put piece back on the queue
 			return
 		}
 
 		hash := sha1.Sum(buf)
 		if !bytes.Equal(hash[:], pw.hash[:]) {
-			goterm.MoveCursor(1, 18)
-			goterm.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
-			goterm.Flush()
+			fmt.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
 			workQueue <- pw // Put piece back on the queue
 			continue
 		}
@@ -229,30 +218,15 @@ func (torrent *Torrent) Download(path string) {
 		donePieces++
 
 		if len(torrent.Files) == 0 {
-			newPosition, err := file.Seek(int64(res.index * torrent.PieceLength), 0)
+			_, err := file.Seek(int64(res.index*torrent.PieceLength), 0)
 			if err != nil {
-				goterm.MoveCursor(1, 18)
-				goterm.Printf(Red+"%v"+Reset, err)
-				goterm.Flush()
+				fmt.Printf(Red+"%v"+Reset, err)
 				return
 			}
-
-			if(newPosition != int64(res.index * torrent.PieceLength)) {
-				goterm.MoveCursor(1, 18)
-				goterm.Println("WTF")
-				goterm.Flush()
-				return
-			}
-			
-			goterm.MoveCursor(1, 20)
-			goterm.Println("Just moved to: ", newPosition)
-			goterm.Flush()
 
 			bytesWritten, err := file.Write(res.buf)
-			if err != nil || bytesWritten!=len(res.buf) {
-				goterm.MoveCursor(1, 18)
-				goterm.Printf(Red+"%v"+Reset, err)
-				goterm.Flush()
+			if err != nil || bytesWritten != len(res.buf) {
+				fmt.Printf(Red+"%v"+Reset, err)
 				return
 			}
 		} else {
@@ -260,47 +234,41 @@ func (torrent *Torrent) Download(path string) {
 		}
 
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
-
-		goterm.MoveCursor(1, 14)
-		for i := 1; i < 300; i++ {
-			goterm.Print(" ")
+		
+		print("\r")
+		for i := 0; i <= 100; i++ {
+			print(" ")
 		}
-		goterm.MoveCursor(1, 14)
 
-		goterm.Print("|" + Cyan)
+		print("\r|" + Cyan)
 
 		for i := 0; i <= 50; i++ {
 			if i <= int(percent)/2 {
-				goterm.Print("=")
+				print("=")
 			} else {
-				goterm.Print(" ")
+				print(" ")
 			}
 		}
 
-		goterm.Print(Reset + "| ")
+		print(Reset + "| ")
 
-		goterm.Printf("%0.2f%% - piece #%d complete", percent, res.index)
-
-		goterm.Flush()
+		fmt.Printf("%0.2f%% - piece #%d complete", percent, res.index)
 	}
 
-	goterm.MoveCursor(1, 14)
-	for i := 1; i < 300; i++ {
-		goterm.Print(" ")
+	print("\r")
+	for i := 0; i <= 100; i++ {
+		print(" ")
 	}
-	goterm.MoveCursor(1, 14)
 
-	goterm.Print("|" + Green)
+	print("\r|" + Green)
 
 	for i := 0; i <= 50; i++ {
-		goterm.Print("=")
+		print("=")
 	}
-	goterm.Print(Reset + "| 100%")
+	print(Reset + "| 100%")
 	for i := 0; i <= 25; i++ {
-		goterm.Print(" ")
+		print(" ")
 	}
-	
-	goterm.Flush()
 
 	close(workQueue)
 
