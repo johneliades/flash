@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"fmt"
 	"github.com/johneliades/flash/peer"
 	"github.com/johneliades/flash/torrent"
 	"github.com/marksamman/bencode"
@@ -15,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 	"strings"
 	"time"
 )
@@ -105,6 +105,7 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 				int(file_dict["length"].(int64)),
 				temp_path,
 			})
+			t.length += int(file_dict["length"].(int64))
 		}
 	} else {
 		//single file
@@ -114,15 +115,20 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	return t
 }
 
-func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([]peer.Peer, error) {
+func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *sync.WaitGroup, 
+	peerID string, port int) {
+	
 	var body []byte
+    
+    defer wg.Done()
 
 	if strings.HasPrefix(tracker, "http") {
 		// ============== HTTP Tracker ==============
 
 		base, ok := url.Parse(tracker)
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		params := url.Values{}
@@ -141,19 +147,22 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 
 		resp, ok := http.Get(base.String())
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		defer resp.Body.Close()
 
 		body, ok = io.ReadAll(resp.Body)
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		data, ok := bencode.Decode(bytes.NewReader(body[:]))
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		// in seconds, for connecting to the tracker again
@@ -162,7 +171,10 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		val := data["peers"]
 		if val != nil {
 			// Wrong if peers are dictionary?
-			return peer.Deserialize([]byte(data["peers"].(string))), nil
+			for _, peer := range peer.Deserialize([]byte(data["peers"].(string))) {
+				peers <- &peer
+			}
+			println("Trying tracker: " + tracker + " - " + Green + "Success" + Reset)
 		}
 	} else if strings.HasPrefix(tracker, "udp") {
 		// ============== UDP Tracker ==============
@@ -171,7 +183,8 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 
 		conn, ok := net.Dial("udp", tracker[len("udp://"):len(tracker)-len("/announce")])
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		conn.SetDeadline(time.Now().Add(2 * time.Second))
@@ -185,24 +198,28 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		binary.BigEndian.PutUint32(buf[12:], uint32(transaction))
 		_, ok = conn.Write(buf)
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		buf_res := make([]byte, 16) // 8 + 4 + 4
 
 		ok = binary.Read(conn, binary.BigEndian, &buf_res)
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		action := binary.BigEndian.Uint32(buf_res[:4])
 		if action != 0 {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		transaction_id := binary.BigEndian.Uint32(buf_res[4:8])
 		if transaction != transaction_id {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		connection_id := binary.BigEndian.Uint64(buf_res[8:])
@@ -227,7 +244,8 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 
 		_, ok = conn.Write(buf)
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		// Wrong cause it blocks if there are less than 10 clients
@@ -235,17 +253,20 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		buf_res = make([]byte, 20+15*6) // 20 header and 10 clients of 6 bytes each
 		ok = binary.Read(conn, binary.BigEndian, &buf_res)
 		if ok != nil {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		action = binary.BigEndian.Uint32(buf_res[:4])
 		if action != 1 {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		transaction_id = binary.BigEndian.Uint32(buf_res[4:8])
 		if transaction != transaction_id {
-			return []peer.Peer{}, ok
+			println("Trying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			return
 		}
 
 		interval := binary.BigEndian.Uint32(buf_res[8:12])
@@ -257,23 +278,14 @@ func (torrent *torrentFile) getPeers(tracker string, peerID string, port int) ([
 		_ = seeders
 
 		buf_res = buf_res[20:]
-
-		return peer.Deserialize(buf_res), nil
-	}
-
-	return []peer.Peer{}, fmt.Errorf("Faulty tracker")
-}
-
-func unique(intSlice []peer.Peer) []peer.Peer {
-	keys := make(map[string]bool)
-	list := []peer.Peer{}
-	for _, entry := range intSlice {
-		if _, value := keys[entry.String()]; !value {
-			keys[entry.String()] = true
-			list = append(list, entry)
+	
+		for _, peer := range peer.Deserialize(buf_res) {
+			peers <- &peer
 		}
+		println("Trying tracker: " + tracker + " - " + Green + "Success" + Reset)
 	}
-	return list
+
+	println("Trying tracker: " + tracker + " - " + Red + "Faulty tracker" + Reset)
 }
 
 func Open(path string) (torrent.Torrent, error) {
@@ -292,28 +304,22 @@ func Open(path string) (torrent.Torrent, error) {
 	//	peer_string := "git:johneliades-" + string(peerID[:])
 
 	var tracker string
-	var peers []peer.Peer
+	//var peers []peer.Peer
+	peers := make(chan *peer.Peer)
+	wg := &sync.WaitGroup{}
 
 	t := btoTorrentStruct(file)
 	for i := 0; i < len(t.announceList); i++ {
 		tracker = t.announceList[i]
 
-		print("Trying tracker: " + tracker)
-		tempPeers, err := t.getPeers(tracker, string(peerID[:]), 3000)
-		if err == nil {
-			peers = append(peers, tempPeers...)
-			println(" - " + Green + "Success" + Reset)
-		} else {
-			println(" - " + Red + err.Error() + Reset)
-		}
+		wg.Add(1)
+		go t.getPeers(tracker, peers, wg, string(peerID[:]), 3000)
 	}
-
-	peers = unique(peers)
-	println(peers)
-
-	if len(peers) == 0 {
-		return torrent.Torrent{}, fmt.Errorf("No peers found")
-	}
+ 
+	go func() {
+		wg.Wait()
+		close(peers)
+	}()
 
 	return torrent.Torrent{
 		Peers:       peers,

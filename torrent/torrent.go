@@ -8,8 +8,10 @@ import (
 	"github.com/johneliades/flash/client"
 	"github.com/johneliades/flash/message"
 	"github.com/johneliades/flash/peer"
+	"path/filepath"
 	"os"
 	"time"
+	"reflect"
 )
 
 const (
@@ -36,7 +38,7 @@ type File struct {
 }
 
 type Torrent struct {
-	Peers       []peer.Peer
+	Peers       chan *peer.Peer
 	PeerID      [20]byte
 	InfoHash    [20]byte
 	PieceHashes [][20]byte
@@ -179,20 +181,73 @@ func attemptDownloadPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 	return state.buf, nil
 }
 
-func (torrent *Torrent) Download(path string) {
-	if len(torrent.Files) == 0 {
-		f, err := os.Create(torrent.Name)
-		if err != nil {
-			println("create file error")
-			return
+func contains(s []peer.Peer, str peer.Peer) bool {
+	for _, v := range s {
+		if reflect.DeepEqual(v, str) {
+			return true
 		}
-		defer f.Close()
-	} else {
-		//print("\nhad multiple files\n")
 	}
 
-	file, _ := os.OpenFile(torrent.Name, os.O_RDWR, 0660)
-	defer file.Close()
+	return false
+}
+
+func (torrent *Torrent) Download(downloadLocation string) {
+	var fileArray []os.File
+	var fileSingle os.File
+
+	if _, err := os.Stat(downloadLocation); os.IsNotExist(err) {
+		err = os.Mkdir(downloadLocation, 0755)
+		if err != nil {
+			fmt.Printf(Red+"%v"+Reset, err)
+		}
+	}
+
+	if len(torrent.Files) == 0 {
+		// Single file in torrent
+		f, err := os.Create(filepath.Join(downloadLocation, torrent.Name))
+		if err != nil {
+			fmt.Printf(Red+"%v"+Reset, err)
+			return
+		}
+		fileSingle = *f
+		defer f.Close()
+	} else {
+		// Multiple files in torrent
+		
+		// Creation of core directory
+		if _, err := os.Stat(filepath.Join(downloadLocation, torrent.Name)); os.IsNotExist(err) {
+			err := os.Mkdir(filepath.Join(downloadLocation, torrent.Name), 0755)
+			if err != nil {
+				fmt.Printf(Red+"%v"+Reset, err)
+			}
+		}
+
+		// Get each "file" in the torrent
+		for _, file := range torrent.Files {
+			// create the nested directories
+			path := filepath.Join(downloadLocation, torrent.Name)
+			for _, f := range file.Path[:len(file.Path)-1] {
+				path = filepath.Join(path, f) 
+			}
+
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				err := os.MkdirAll(path, 0755)
+				if err != nil {
+					fmt.Printf(Red+"%v"+Reset, err)
+				}
+			}
+			
+			// and then the file
+			f, err := os.Create(filepath.Join(path, file.Path[len(file.Path)-1]))
+			if err != nil {
+				println("create file error")
+				return
+			}
+			fileArray = append(fileArray, *f)
+
+			defer f.Close()
+		}
+	}
 
 	workQueue := make(chan *pieceWork, len(torrent.PieceHashes))
 	results := make(chan *pieceResult)
@@ -202,13 +257,19 @@ func (torrent *Torrent) Download(path string) {
 		if end > torrent.Length {
 			end = torrent.Length
 		}
-		// Wrong for multiple files
 		workQueue <- &pieceWork{index, hash, end - begin}
 	}
 
-	for _, peer := range torrent.Peers {
-		go torrent.startDownload(peer, workQueue, results)
+	var peerMap []peer.Peer
+
+	for peer := range torrent.Peers {
+		if !contains(peerMap, *peer) {
+			go torrent.startDownload(*peer, workQueue, results)
+			peerMap = append(peerMap, *peer)
+		}
 	}
+
+	println(Green + "Download started" + Reset)
 
 	donePieces := 0
 
@@ -218,13 +279,13 @@ func (torrent *Torrent) Download(path string) {
 		donePieces++
 
 		if len(torrent.Files) == 0 {
-			_, err := file.Seek(int64(res.index*torrent.PieceLength), 0)
+			_, err := fileSingle.Seek(int64(res.index*torrent.PieceLength), 0)
 			if err != nil {
 				fmt.Printf(Red+"%v"+Reset, err)
 				return
 			}
 
-			bytesWritten, err := file.Write(res.buf)
+			bytesWritten, err := fileSingle.Write(res.buf)
 			if err != nil || bytesWritten != len(res.buf) {
 				fmt.Printf(Red+"%v"+Reset, err)
 				return
