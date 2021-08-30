@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"os"
 	"time"
+	"math"
 	"reflect"
 )
 
@@ -18,10 +19,12 @@ const (
 	Reset  = "\033[0m"
 	Red    = "\033[31m"
 	Green  = "\033[32m"
+	GreenB  = "\033[42m"
 	Yellow = "\033[33m"
 	Blue   = "\033[34m"
 	Purple = "\033[35m"
 	Cyan   = "\033[36m"
+	CyanB = "\033[46m"
 	Gray   = "\033[37m"
 	White  = "\033[97m"
 )
@@ -193,6 +196,48 @@ func ByteCountIEC(b int64) string {
 		float64(b)/float64(div), "KMGTPE"[exp])
 }
 
+func secondsToHuman(input int) (result string) {
+	years := math.Floor(float64(input) / 60 / 60 / 24 / 7 / 30 / 12)
+	seconds := input % (60 * 60 * 24 * 7 * 30 * 12)
+	months := math.Floor(float64(seconds) / 60 / 60 / 24 / 7 / 30)
+	seconds = input % (60 * 60 * 24 * 7 * 30)
+	weeks := math.Floor(float64(seconds) / 60 / 60 / 24 / 7)
+	seconds = input % (60 * 60 * 24 * 7)
+	days := math.Floor(float64(seconds) / 60 / 60 / 24)
+	seconds = input % (60 * 60 * 24)
+	hours := math.Floor(float64(seconds) / 60 / 60)
+	seconds = input % (60 * 60)
+	minutes := math.Floor(float64(seconds) / 60)
+	seconds = input % 60
+
+	if years > 0 {
+		result = strconv.Itoa(int(years)) + "y " + strconv.Itoa(int(months)) + "mo " + 
+		strconv.Itoa(int(weeks)) + "w " + strconv.Itoa(int(days)) + "d " + 
+		strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " + 
+		strconv.Itoa(int(seconds)) + "s"
+	} else if months > 0 {
+		result = strconv.Itoa(int(months)) + "mo " + strconv.Itoa(int(weeks)) + "w " + 
+		strconv.Itoa(int(days)) + "d " + strconv.Itoa(int(hours)) + "h " + 
+		strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
+	} else if weeks > 0 {
+		result = strconv.Itoa(int(weeks)) + "w " + strconv.Itoa(int(days)) + "d " + 
+		strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " + 
+		strconv.Itoa(int(seconds)) + "s"
+	} else if days > 0 {
+		result = strconv.Itoa(int(days)) + "d " + strconv.Itoa(int(hours)) + "h " + 
+		strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
+	} else if hours > 0 {
+		result = strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " + 
+		strconv.Itoa(int(seconds)) + "s"
+	} else if minutes > 0 {
+		result = strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
+	} else {
+		result = strconv.Itoa(int(seconds)) + "s"
+	}
+
+	return
+}
+
 func (torrent *Torrent) Download(downloadLocation string) {
 	var fileArray []os.File
 	var fileSingle os.File
@@ -288,7 +333,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
     start := time.Now()
 	
 	var rate float64
-	var old_rate float64
+	var oldRate float64
 
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
@@ -297,9 +342,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		newPieces++
 
 		if time.Since(start).Seconds()>1 {
-			old_rate = rate
+			oldRate = rate
 			rate = float64(newPieces) * float64(torrent.PieceLength) / time.Since(start).Seconds()
-			rate = (rate + old_rate) / 2
+			rate = (rate + oldRate) / 2
 			if (rate/1024 < 20) {
 				maxBacklog = int(rate/1024 + 2);
 			} else {
@@ -332,20 +377,42 @@ func (torrent *Torrent) Download(downloadLocation string) {
 			print(" ")
 		}
 
-		print("\r|" + Cyan)
+		percentStr := fmt.Sprintf("%0.2f%%", percent)
 
+		print(Cyan + "\r▕")
 		for i := 0; i <= 50; i++ {
 			if i <= int(percent)/2 {
-				print("=")
+				print(CyanB)
+				if(i==23) {
+					print(percentStr)
+				} else if(i==24 || i==25 || i ==26) {
+
+				} else {
+					print(" ")
+				}
+				print(Reset)
 			} else {
-				print(" ")
+				if(i==23) {
+					print(percentStr)
+				} else if(i==24 || i==25 || i ==26) {
+				} else {
+					print(" ")
+				}
 			}
 		}
+		print(Cyan + "▏ " + Reset)
 
-		print(Reset + "| ")
+		var eta string
+		if(rate==0) {
+			eta = "∞"
+		} else {
+			eta = secondsToHuman((torrent.Length-res.index*torrent.PieceLength+torrent.PieceLength)/int(rate))
+		}
 
-		fmt.Printf("%0.2f%% - #%s, %d left, %v/s", percent, Green + strconv.Itoa(res.index) + Reset,
-			numPieces - donePieces, ByteCountIEC(int64(rate)))
+		fmt.Printf("#%s | %d (%s) | %v/s | %s",
+			Green + strconv.Itoa(res.index) + Reset, numPieces - donePieces,
+			ByteCountIEC(int64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)),
+			ByteCountIEC(int64(rate)), eta)
 	}
 
 	print("\r")
@@ -353,12 +420,18 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		print(" ")
 	}
 
-	print("\r|" + Green)
-
+	print(Green + "\r▕")
 	for i := 0; i <= 50; i++ {
-		print("=")
+		print(GreenB)
+		if(i==23) {
+			print("100%")
+		} else if(i==24 || i==25 || i ==26) {
+		} else {
+			print(" ")
+		}
+		print(Reset)
 	}
-	print(Reset + "| 100%")
+	print(Cyan + "▏ " + Reset)
 	for i := 0; i <= 25; i++ {
 		print(" ")
 	}
