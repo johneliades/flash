@@ -67,22 +67,22 @@ func Read(reader io.Reader) (*Message, error) {
 // ParsePiece parses a PIECE message and copies its payload into a buffer
 func ParsePiece(index int, buf []byte, msg *Message) (int, error) {
 	if msg.ID != Piece {
-		return 0, fmt.Errorf("Expected PIECE (ID %d), got ID %d", Piece, msg.ID)
+		return 0, fmt.Errorf("Wrong piece id")
 	}
 	if len(msg.Payload) < 8 {
-		return 0, fmt.Errorf("Payload too short. %d < 8", len(msg.Payload))
+		return 0, fmt.Errorf("Payload of wrong size. %d < 8", len(msg.Payload))
 	}
 	parsedIndex := int(binary.BigEndian.Uint32(msg.Payload[0:4]))
 	if parsedIndex != index {
-		return 0, fmt.Errorf("Expected index %d, got %d", index, parsedIndex)
+		return 0, fmt.Errorf("Wrong index")
 	}
 	begin := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
 	if begin >= len(buf) {
-		return 0, fmt.Errorf("Begin offset too high. %d >= %d", begin, len(buf))
+		return 0, fmt.Errorf("Wrong offset")
 	}
 	data := msg.Payload[8:]
 	if begin+len(data) > len(buf) {
-		return 0, fmt.Errorf("Data too long [%d] for offset %d with length %d", len(data), begin, len(buf))
+		return 0, fmt.Errorf("Wrong ammount of data")
 	}
 	copy(buf[begin:], data)
 	return len(data), nil

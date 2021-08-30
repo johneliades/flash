@@ -72,76 +72,6 @@ type pieceProgress struct {
 	backlog    int
 }
 
-func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
-	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
-
-	if err == nil {
-		println(peer.String() + " - " + Green + "Success" + Reset)
-	} else {
-		println(peer.String() + Red + " - " + err.Error() + Reset)
-		return
-	}
-
-	c.SendUnchoke()
-	c.SendInterested()
-
-	for pw := range workQueue {
-		if !c.BitField.HasPiece(pw.index) {
-			workQueue <- pw // Put piece back on the queue
-			continue
-		}
-
-		buf, err := getPiece(c, pw)
-		if err != nil {
-			//println(Red + "Exiting" + Reset, err)
-			workQueue <- pw // Put piece back on the queue
-			return
-		}
-
-		hash := sha1.Sum(buf)
-		if !bytes.Equal(hash[:], pw.hash[:]) {
-			fmt.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
-			workQueue <- pw // Put piece back on the queue
-			continue
-		}
-
-		c.SendHave(pw.index)
-		results <- &pieceResult{pw.index, buf}
-	}
-}
-
-func (state *pieceProgress) readMessage() error {
-	msg, err := message.Read(state.client.Conn)
-	if err != nil {
-		return err
-	}
-
-	if msg == nil { // keep-alive
-		return nil
-	}
-
-	switch msg.ID {
-	case message.Unchoke:
-		state.client.Choked = false
-	case message.Choke:
-		state.client.Choked = true
-	case message.Have:
-		index, err := message.ParseHave(msg)
-		if err != nil {
-			return err
-		}
-		state.client.BitField.SetPiece(index)
-	case message.Piece:
-		n, err := message.ParsePiece(state.index, state.buf, msg)
-		if err != nil {
-			return err
-		}
-		state.downloaded += n
-		state.backlog--
-	}
-	return nil
-}
-
 func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 	state := pieceProgress{
 		index:  pw.index,
@@ -174,13 +104,83 @@ func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 			}
 		}
 
-		err := state.readMessage()
+		// get response
+		msg, err := message.Read(state.client.Conn)
 		if err != nil {
 			return nil, err
+		}
+
+		if msg == nil { // keep-alive
+			continue
+		}
+
+		switch msg.ID {
+			case message.Unchoke:
+				state.client.Choked = false
+			case message.Choke:
+				state.client.Choked = true
+			case message.Have:
+				index, err := message.ParseHave(msg)
+				if err != nil {
+					return nil, err
+				}
+				state.client.BitField.SetPiece(index)
+			case message.Piece:
+				n, err := message.ParsePiece(state.index, state.buf, msg)
+				if err != nil {
+					return nil, err
+				}
+				state.downloaded += n
+				state.backlog--
 		}
 	}
 
 	return state.buf, nil
+}
+
+var statusLen int = 0
+
+func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
+	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
+
+	space := ""
+	for i := 0; i <= 50 + 2 + statusLen; i++ {
+		space += " "
+	}
+
+	if err == nil {
+		println("\r" + space + "\r" + peer.String() + " - " + Green + "Success" + Reset)
+	} else {
+		println("\r" + space + "\r" + peer.String() + Red + " - " + err.Error() + Reset)
+		return
+	}
+
+	c.SendUnchoke()
+	c.SendInterested()
+
+	for pw := range workQueue {
+		if !c.BitField.HasPiece(pw.index) {
+			workQueue <- pw // Put piece back on the queue
+			continue
+		}
+
+		buf, err := getPiece(c, pw)
+		if err != nil {
+			//println(Red + "Exiting" + Reset, err)
+			workQueue <- pw // Put piece back on the queue
+			return
+		}
+
+		hash := sha1.Sum(buf)
+		if !bytes.Equal(hash[:], pw.hash[:]) {
+			fmt.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
+			workQueue <- pw // Put piece back on the queue
+			continue
+		}
+
+		c.SendHave(pw.index)
+		results <- &pieceResult{pw.index, buf}
+	}
 }
 
 func ByteCountIEC(b int64) string {
@@ -326,7 +326,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		peersUsed = append(peersUsed, *peer)
 	}
 
-	println(Green + "Download started" + Reset)
+	println("\r" + Green + "Download started" + Reset)
 
 	donePieces := 0
 
@@ -372,7 +372,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		}
 
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
-		
+
 		print("\r")
 		for i := 0; i <= 100; i++ {
 			print(" ")
@@ -415,10 +415,14 @@ func (torrent *Torrent) Download(downloadLocation string) {
 			eta = secondsToHuman((torrent.Length-res.index*torrent.PieceLength+torrent.PieceLength)/int(rate))
 		}
 
-		fmt.Printf("#%s | %d (%s) | %v/s | %s",
+		status := fmt.Sprintf("#%s | %d (%s) | %v/s | %s",
 			Green + strconv.Itoa(res.index) + Reset, numPieces - donePieces,
 			ByteCountIEC(int64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)),
 			ByteCountIEC(int64(rate)), eta)
+
+		print(status)
+
+		statusLen = len(status)
 	}
 
 	print("\r")
@@ -444,6 +448,4 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	}
 
 	close(workQueue)
-
-	//	return buf
 }
