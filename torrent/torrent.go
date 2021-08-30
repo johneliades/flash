@@ -426,7 +426,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		print(" ")
 	}
 
-	print(Cyan + "\r▕" + Reset)
+	print(Green + "\r▕" + Reset)
 	for i := 0; i <= 50; i++ {
 		print(GreenB)
 		print(White)
@@ -438,7 +438,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		}
 		print(Reset)
 	}
-	print(Cyan + "▏ " + Reset)
+	print(Green + "▏ " + Reset)
 	for i := 0; i <= 25; i++ {
 		print(" ")
 	}
