@@ -27,7 +27,7 @@ const (
 	Cyan   = "\033[36m"
 	CyanB = "\033[46m"
 	Gray   = "\033[37m"
-	White  = "\033[97m"
+	White  = "\033[1;97m"
 )
 
 // MaxBlockSize is the largest number of bytes a request can ask for
@@ -386,7 +386,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 				print(CyanB)
 			}
 			if(int(percent)/2>21) {
-				print(Purple)
+				print(White)
 			}
 
 			if(i<22 || i>27) {
@@ -431,7 +431,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	print(Green + "\r▕")
 	for i := 0; i <= 50; i++ {
 		print(GreenB)
-		print(Red)
+		print(White)
 		if(i==22) {
 			print("100%")
 		} else if(i==23 || i==24 || i ==25 || i==26 || i==27) {
