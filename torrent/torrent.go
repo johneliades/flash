@@ -17,6 +17,7 @@ import (
 
 const (
 	Reset  = "\033[0m"
+	Black = "\033[30m"
 	Red    = "\033[31m"
 	Green  = "\033[32m"
 	GreenB  = "\033[42m"
@@ -192,7 +193,7 @@ func ByteCountIEC(b int64) string {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f %ciB",
+	return fmt.Sprintf("%.1f %cB",
 		float64(b)/float64(div), "KMGTPE"[exp])
 }
 
@@ -377,28 +378,35 @@ func (torrent *Torrent) Download(downloadLocation string) {
 			print(" ")
 		}
 
-		percentStr := fmt.Sprintf("%0.2f%%", percent)
+		percentStr := fmt.Sprintf("%0.2f", percent)
 
 		print(Cyan + "\r▕")
 		for i := 0; i <= 50; i++ {
-			if i <= int(percent)/2 {
+			if(i <= int(percent)/2) {
 				print(CyanB)
-				if(i==23) {
-					print(percentStr)
-				} else if(i==24 || i==25 || i ==26) {
+			}
+			if(int(percent)/2>21) {
+				print(Purple)
+			}
 
-				} else {
-					print(" ")
-				}
-				print(Reset)
+			if(i<22 || i>27) {
+				print(" ")
 			} else {
-				if(i==23) {
-					print(percentStr)
-				} else if(i==24 || i==25 || i ==26) {
-				} else {
-					print(" ")
+				if(i==22) {
+					fmt.Printf("%c", percentStr[0])
+				} else if(i==23) {
+					fmt.Printf("%c", percentStr[1])
+				} else if(i==24) {
+					fmt.Printf("%c", percentStr[2])
+				} else if(i==25) {
+					fmt.Printf("%c", percentStr[3])
+				} else if(i==26) && len(percentStr)>4 {
+					fmt.Printf("%c", percentStr[4])
+				} else if(i==27) {
+					print("%")
 				}
 			}
+			print(Reset)
 		}
 		print(Cyan + "▏ " + Reset)
 
@@ -423,9 +431,10 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	print(Green + "\r▕")
 	for i := 0; i <= 50; i++ {
 		print(GreenB)
-		if(i==23) {
+		print(Red)
+		if(i==22) {
 			print("100%")
-		} else if(i==24 || i==25 || i ==26) {
+		} else if(i==23 || i==24 || i ==25 || i==26 || i==27) {
 		} else {
 			print(" ")
 		}
