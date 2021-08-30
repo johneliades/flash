@@ -30,7 +30,7 @@ const (
 const MaxBlockSize = 16384
 
 // maxBacklog is the number of unfulfilled requests a client can have in its pipeline
-var maxBacklog int = 5
+var maxBacklog int = 200
 
 type File struct {
 	Length int
@@ -288,6 +288,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
     start := time.Now()
 	
 	var rate float64
+	var old_rate float64
 
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
@@ -295,8 +296,10 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		donePieces++
 		newPieces++
 
-		if time.Since(start).Seconds()>2 {
+		if time.Since(start).Seconds()>1 {
+			old_rate = rate
 			rate = float64(newPieces) * float64(torrent.PieceLength) / time.Since(start).Seconds()
+			rate = (rate + old_rate) / 2
 			if (rate/1024 < 20) {
 				maxBacklog = int(rate/1024 + 2);
 			} else {
