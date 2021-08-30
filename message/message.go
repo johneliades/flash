@@ -9,7 +9,7 @@ import (
 const (
 	Choke         uint8 = 0
 	Unchoke       uint8 = 1
-	interested    uint8 = 2
+	Interested    uint8 = 2
 	notInterested uint8 = 3
 	Have          uint8 = 4
 	BitField      uint8 = 5
@@ -98,4 +98,19 @@ func ParseHave(msg *Message) (int, error) {
 	}
 	index := int(binary.BigEndian.Uint32(msg.Payload))
 	return index, nil
+}
+
+func MakeRequest(index, begin, length int) *Message {
+	payload := make([]byte, 12)
+	binary.BigEndian.PutUint32(payload[0:4], uint32(index))
+	binary.BigEndian.PutUint32(payload[4:8], uint32(begin))
+	binary.BigEndian.PutUint32(payload[8:12], uint32(length))
+	return &Message{ID: Request, Payload: payload}
+}
+
+// FormatHave creates a HAVE message
+func MakeHave(index int) *Message {
+	payload := make([]byte, 4)
+	binary.BigEndian.PutUint32(payload, uint32(index))
+	return &Message{ID: Have, Payload: payload}
 }

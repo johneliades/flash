@@ -3,7 +3,6 @@ package torrent
 import (
 	"bytes"
 	"crypto/sha1"
-	"encoding/binary"
 	"fmt"
 	"github.com/johneliades/flash/client"
 	"github.com/johneliades/flash/message"
@@ -68,14 +67,18 @@ type pieceProgress struct {
 	backlog    int
 }
 
-func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
+func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
 	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
 
 	if err == nil {
 		println(peer.String() + " - " + Green + "Success" + Reset)
 	} else {
 		println(peer.String() + Red + " - " + err.Error() + Reset)
+		return
 	}
+
+	c.SendUnchoke()
+	c.SendInterested()
 
 	for pw := range workQueue {
 		if !c.BitField.HasPiece(pw.index) {
@@ -83,7 +86,7 @@ func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork,
 			continue
 		}
 
-		buf, err := attemptDownloadPiece(c, pw)
+		buf, err := getPiece(c, pw)
 		if err != nil {
 			//println(Red + "Exiting" + Reset, err)
 			workQueue <- pw // Put piece back on the queue
@@ -97,7 +100,7 @@ func (torrent *Torrent) startDownload(peer peer.Peer, workQueue chan *pieceWork,
 			continue
 		}
 
-		//		c.SendHave(pw.index)
+		c.SendHave(pw.index)
 		results <- &pieceResult{pw.index, buf}
 	}
 }
@@ -134,7 +137,7 @@ func (state *pieceProgress) readMessage() error {
 	return nil
 }
 
-func attemptDownloadPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
+func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 	state := pieceProgress{
 		index:  pw.index,
 		client: c,
@@ -156,17 +159,11 @@ func attemptDownloadPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 					blockSize = pw.length - state.requested
 				}
 
-				payload := make([]byte, 12)
-				binary.BigEndian.PutUint32(payload[0:4], uint32(pw.index))
-				binary.BigEndian.PutUint32(payload[4:8], uint32(state.requested))
-				binary.BigEndian.PutUint32(payload[8:12], uint32(blockSize))
-
-				req := &message.Message{ID: message.Request, Payload: payload}
-
-				_, err := c.Conn.Write(req.Serialize())
+				err := c.SendRequest(pw.index, state.requested, blockSize)
 				if err != nil {
 					return nil, err
 				}
+
 				state.backlog++
 				state.requested += blockSize
 			}
@@ -179,16 +176,6 @@ func attemptDownloadPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 	}
 
 	return state.buf, nil
-}
-
-func contains(s []peer.Peer, str peer.Peer) bool {
-	for _, v := range s {
-		if reflect.DeepEqual(v, str) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (torrent *Torrent) Download(downloadLocation string) {
@@ -249,6 +236,8 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		}
 	}
 
+	numPieces := 0
+
 	workQueue := make(chan *pieceWork, len(torrent.PieceHashes))
 	results := make(chan *pieceResult)
 	for index, hash := range torrent.PieceHashes {
@@ -257,16 +246,23 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		if end > torrent.Length {
 			end = torrent.Length
 		}
+		numPieces++
 		workQueue <- &pieceWork{index, hash, end - begin}
 	}
 
-	var peerMap []peer.Peer
+	// Connect to each peer once
+	var peersUsed []peer.Peer
 
+	SKIP:
 	for peer := range torrent.Peers {
-		if !contains(peerMap, *peer) {
-			go torrent.startDownload(*peer, workQueue, results)
-			peerMap = append(peerMap, *peer)
+		for _, v := range peersUsed {
+			if reflect.DeepEqual(v, *peer) {
+				continue SKIP
+			}
 		}
+
+		go torrent.startPeer(*peer, workQueue, results)
+		peersUsed = append(peersUsed, *peer)
 	}
 
 	println(Green + "Download started" + Reset)
@@ -313,7 +309,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 
 		print(Reset + "| ")
 
-		fmt.Printf("%0.2f%% - piece #%d complete", percent, res.index)
+		fmt.Printf("%0.2f%% - piece #%d complete, %d left", percent, res.index, numPieces - donePieces)
 	}
 
 	print("\r")
