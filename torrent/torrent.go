@@ -283,19 +283,27 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	println(Green + "Download started" + Reset)
 
 	donePieces := 0
-    	
+
+	newPieces := 0    	
     start := time.Now()
+	
+	var rate float64
 
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
 
 		donePieces++
-		
-		rate := float64(torrent.PieceLength) / time.Since(start).Seconds()
-		if (rate/1024 < 20) {
-			maxBacklog = int(rate/1024 + 2);
-		} else {
-			maxBacklog = int(rate/1024/5 + 18);
+		newPieces++
+
+		if time.Since(start).Seconds()>2 {
+			rate = float64(newPieces) * float64(torrent.PieceLength) / time.Since(start).Seconds()
+			if (rate/1024 < 20) {
+				maxBacklog = int(rate/1024 + 2);
+			} else {
+				maxBacklog = int(rate/1024/5 + 18);
+			}
+			newPieces = 0
+			start = time.Now()
 		}
 
 		if len(torrent.Files) == 0 {
@@ -313,8 +321,6 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		} else {
 			//print("\nhad multiple files\n")
 		}
-
-		start = time.Now()
 
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
 		
@@ -335,7 +341,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 
 		print(Reset + "| ")
 
-		fmt.Printf("%0.2f%% - #%s, %d left, %v", percent, Green + strconv.Itoa(res.index) + Reset,
+		fmt.Printf("%0.2f%% - #%s, %d left, %v/s", percent, Green + strconv.Itoa(res.index) + Reset,
 			numPieces - donePieces, ByteCountIEC(int64(rate)))
 	}
 
