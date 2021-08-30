@@ -8,6 +8,7 @@ import (
 	"github.com/johneliades/flash/message"
 	"github.com/johneliades/flash/peer"
 	"path/filepath"
+	"strconv"
 	"os"
 	"time"
 	"reflect"
@@ -28,8 +29,8 @@ const (
 // MaxBlockSize is the largest number of bytes a request can ask for
 const MaxBlockSize = 16384
 
-// MaxBacklog is the number of unfulfilled requests a client can have in its pipeline
-const MaxBacklog = 5
+// maxBacklog is the number of unfulfilled requests a client can have in its pipeline
+var maxBacklog int = 5
 
 type File struct {
 	Length int
@@ -152,7 +153,7 @@ func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 	for state.downloaded < pw.length {
 		// If unchoked, send requests until we have enough unfulfilled requests
 		if !state.client.Choked {
-			for state.backlog < MaxBacklog && state.requested < pw.length {
+			for state.backlog < maxBacklog && state.requested < pw.length {
 				blockSize := MaxBlockSize
 				// Last block might be shorter than the typical block
 				if pw.length-state.requested < blockSize {
@@ -176,6 +177,20 @@ func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 	}
 
 	return state.buf, nil
+}
+
+func ByteCountIEC(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB",
+		float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 func (torrent *Torrent) Download(downloadLocation string) {
@@ -268,11 +283,20 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	println(Green + "Download started" + Reset)
 
 	donePieces := 0
+    	
+    start := time.Now()
 
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
 
 		donePieces++
+		
+		rate := float64(torrent.PieceLength) / time.Since(start).Seconds()
+		if (rate/1024 < 20) {
+			maxBacklog = int(rate/1024 + 2);
+		} else {
+			maxBacklog = int(rate/1024/5 + 18);
+		}
 
 		if len(torrent.Files) == 0 {
 			_, err := fileSingle.Seek(int64(res.index*torrent.PieceLength), 0)
@@ -289,6 +313,8 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		} else {
 			//print("\nhad multiple files\n")
 		}
+
+		start = time.Now()
 
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
 		
@@ -309,7 +335,8 @@ func (torrent *Torrent) Download(downloadLocation string) {
 
 		print(Reset + "| ")
 
-		fmt.Printf("%0.2f%% - piece #%d complete, %d left", percent, res.index, numPieces - donePieces)
+		fmt.Printf("%0.2f%% - #%s, %d left, %v", percent, Green + strconv.Itoa(res.index) + Reset,
+			numPieces - donePieces, ByteCountIEC(int64(rate)))
 	}
 
 	print("\r")
