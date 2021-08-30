@@ -380,14 +380,12 @@ func (torrent *Torrent) Download(downloadLocation string) {
 
 		percentStr := fmt.Sprintf("%0.2f", percent)
 
-		print(Cyan + "\r▕")
+		print(Cyan + "\r▕" + Reset)
 		for i := 0; i <= 50; i++ {
 			if(i <= int(percent)/2) {
 				print(CyanB)
 			}
-			if(int(percent)/2>21) {
-				print(White)
-			}
+			print(White)
 
 			if(i<22 || i>27) {
 				print(" ")
@@ -428,7 +426,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		print(" ")
 	}
 
-	print(Green + "\r▕")
+	print(Cyan + "\r▕" + Reset)
 	for i := 0; i <= 50; i++ {
 		print(GreenB)
 		print(White)
