@@ -66,36 +66,25 @@ func Read(reader io.Reader) (*Message, error) {
 
 // ParsePiece parses a PIECE message and copies its payload into a buffer
 func ParsePiece(index int, buf []byte, msg *Message) (int, error) {
-	if msg.ID != Piece {
-		return 0, fmt.Errorf("Wrong piece id")
-	}
-	if len(msg.Payload) < 8 {
-		return 0, fmt.Errorf("Payload of wrong size. %d < 8", len(msg.Payload))
-	}
 	parsedIndex := int(binary.BigEndian.Uint32(msg.Payload[0:4]))
-	if parsedIndex != index {
-		return 0, fmt.Errorf("Wrong index")
-	}
 	begin := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
-	if begin >= len(buf) {
-		return 0, fmt.Errorf("Wrong offset")
-	}
 	data := msg.Payload[8:]
-	if begin+len(data) > len(buf) {
-		return 0, fmt.Errorf("Wrong ammount of data")
+
+	if msg.ID != Piece || len(msg.Payload) < 8 || parsedIndex != index ||
+		begin >= len(buf) || begin+len(data) > len(buf) {
+
+		return 0, fmt.Errorf("ParsePiece failed")
 	}
+
 	copy(buf[begin:], data)
 	return len(data), nil
 }
 
-// ParseHave parses a HAVE message
 func ParseHave(msg *Message) (int, error) {
-	if msg.ID != Have {
-		return 0, fmt.Errorf("Expected HAVE (ID %d), got ID %d", Have, msg.ID)
+	if msg.ID != Have || len(msg.Payload) != 4 {
+		return 0, fmt.Errorf("ParseHave failed")
 	}
-	if len(msg.Payload) != 4 {
-		return 0, fmt.Errorf("Expected payload length 4, got length %d", len(msg.Payload))
-	}
+
 	index := int(binary.BigEndian.Uint32(msg.Payload))
 	return index, nil
 }
@@ -108,7 +97,6 @@ func MakeRequest(index, begin, length int) *Message {
 	return &Message{ID: Request, Payload: payload}
 }
 
-// FormatHave creates a HAVE message
 func MakeHave(index int) *Message {
 	payload := make([]byte, 4)
 	binary.BigEndian.PutUint32(payload, uint32(index))

@@ -92,8 +92,7 @@ func New(peer peer.Peer, peerID, infoHash [20]byte) (*Client, error) {
 }
 
 func (c *Client) SendRequest(index, begin, length int) error {
-	req := message.MakeRequest(index, begin, length)
-	_, err := c.Conn.Write(req.Serialize())
+	_, err := c.Conn.Write(message.MakeRequest(index, begin, length).Serialize())
 	return err
 }
 
@@ -110,7 +109,6 @@ func (c *Client) SendUnchoke() error {
 }
 
 func (c *Client) SendHave(index int) error {
-	msg := message.MakeHave(index)
-	_, err := c.Conn.Write(msg.Serialize())
+	_, err := c.Conn.Write(message.MakeHave(index).Serialize())
 	return err
 }

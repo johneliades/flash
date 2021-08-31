@@ -14,8 +14,8 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"sync"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -115,12 +115,12 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	return t
 }
 
-func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *sync.WaitGroup, 
+func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *sync.WaitGroup,
 	peerID string, port int) {
-	
+
 	var body []byte
-    
-    defer wg.Done()
+
+	defer wg.Done()
 
 	if strings.HasPrefix(tracker, "http") {
 		// ============== HTTP Tracker ==============
@@ -279,7 +279,7 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 		_ = seeders
 
 		buf_res = buf_res[20:]
-	
+
 		for _, peer := range peer.Deserialize(buf_res) {
 			peers <- &peer
 		}
@@ -317,7 +317,7 @@ func Open(path string) (torrent.Torrent, error) {
 		wg.Add(1)
 		go t.getPeers(tracker, peers, wg, string(peerID[:]), 3000)
 	}
- 
+
 	go func() {
 		wg.Wait()
 		close(peers)

@@ -7,25 +7,26 @@ import (
 	"github.com/johneliades/flash/client"
 	"github.com/johneliades/flash/message"
 	"github.com/johneliades/flash/peer"
-	"path/filepath"
-	"strconv"
-	"os"
-	"time"
 	"math"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const (
 	Reset  = "\033[0m"
-	Black = "\033[30m"
+	Black  = "\033[30m"
 	Red    = "\033[31m"
 	Green  = "\033[32m"
-	GreenB  = "\033[42m"
+	GreenB = "\033[42m"
 	Yellow = "\033[33m"
 	Blue   = "\033[34m"
 	Purple = "\033[35m"
 	Cyan   = "\033[36m"
-	CyanB = "\033[46m"
+	CyanB  = "\033[46m"
 	Gray   = "\033[37m"
 	White  = "\033[1;97m"
 )
@@ -115,23 +116,23 @@ func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 		}
 
 		switch msg.ID {
-			case message.Unchoke:
-				state.client.Choked = false
-			case message.Choke:
-				state.client.Choked = true
-			case message.Have:
-				index, err := message.ParseHave(msg)
-				if err != nil {
-					return nil, err
-				}
-				state.client.BitField.SetPiece(index)
-			case message.Piece:
-				n, err := message.ParsePiece(state.index, state.buf, msg)
-				if err != nil {
-					return nil, err
-				}
-				state.downloaded += n
-				state.backlog--
+		case message.Unchoke:
+			state.client.Choked = false
+		case message.Choke:
+			state.client.Choked = true
+		case message.Have:
+			index, err := message.ParseHave(msg)
+			if err != nil {
+				return nil, err
+			}
+			state.client.BitField.SetPiece(index)
+		case message.Piece:
+			n, err := message.ParsePiece(state.index, state.buf, msg)
+			if err != nil {
+				return nil, err
+			}
+			state.downloaded += n
+			state.backlog--
 		}
 	}
 
@@ -143,15 +144,10 @@ var statusLen int = 0
 func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
 	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
 
-	space := ""
-	for i := 0; i <= 50 + 2 + statusLen; i++ {
-		space += " "
-	}
-
 	if err == nil {
-		println("\r" + space + "\r" + peer.String() + " - " + Green + "Success" + Reset)
+		println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() + " - " + Green + "Success" + Reset)
 	} else {
-		println("\r" + space + "\r" + peer.String() + Red + " - " + err.Error() + Reset)
+		println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() + Red + " - " + err.Error() + Reset)
 		return
 	}
 
@@ -166,7 +162,9 @@ func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, res
 
 		buf, err := getPiece(c, pw)
 		if err != nil {
-			//println(Red + "Exiting" + Reset, err)
+			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() +
+				Red + " - exiting: " + err.Error() + Reset)
+
 			workQueue <- pw // Put piece back on the queue
 			return
 		}
@@ -212,24 +210,24 @@ func secondsToHuman(input int) (result string) {
 	seconds = input % 60
 
 	if years > 0 {
-		result = strconv.Itoa(int(years)) + "y " + strconv.Itoa(int(months)) + "mo " + 
-		strconv.Itoa(int(weeks)) + "w " + strconv.Itoa(int(days)) + "d " + 
-		strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " + 
-		strconv.Itoa(int(seconds)) + "s"
+		result = strconv.Itoa(int(years)) + "y " + strconv.Itoa(int(months)) + "mo " +
+			strconv.Itoa(int(weeks)) + "w " + strconv.Itoa(int(days)) + "d " +
+			strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " +
+			strconv.Itoa(int(seconds)) + "s"
 	} else if months > 0 {
-		result = strconv.Itoa(int(months)) + "mo " + strconv.Itoa(int(weeks)) + "w " + 
-		strconv.Itoa(int(days)) + "d " + strconv.Itoa(int(hours)) + "h " + 
-		strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
+		result = strconv.Itoa(int(months)) + "mo " + strconv.Itoa(int(weeks)) + "w " +
+			strconv.Itoa(int(days)) + "d " + strconv.Itoa(int(hours)) + "h " +
+			strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
 	} else if weeks > 0 {
-		result = strconv.Itoa(int(weeks)) + "w " + strconv.Itoa(int(days)) + "d " + 
-		strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " + 
-		strconv.Itoa(int(seconds)) + "s"
+		result = strconv.Itoa(int(weeks)) + "w " + strconv.Itoa(int(days)) + "d " +
+			strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " +
+			strconv.Itoa(int(seconds)) + "s"
 	} else if days > 0 {
-		result = strconv.Itoa(int(days)) + "d " + strconv.Itoa(int(hours)) + "h " + 
-		strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
+		result = strconv.Itoa(int(days)) + "d " + strconv.Itoa(int(hours)) + "h " +
+			strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
 	} else if hours > 0 {
-		result = strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " + 
-		strconv.Itoa(int(seconds)) + "s"
+		result = strconv.Itoa(int(hours)) + "h " + strconv.Itoa(int(minutes)) + "m " +
+			strconv.Itoa(int(seconds)) + "s"
 	} else if minutes > 0 {
 		result = strconv.Itoa(int(minutes)) + "m " + strconv.Itoa(int(seconds)) + "s"
 	} else {
@@ -261,7 +259,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		defer f.Close()
 	} else {
 		// Multiple files in torrent
-		
+
 		// Creation of core directory
 		if _, err := os.Stat(filepath.Join(downloadLocation, torrent.Name)); os.IsNotExist(err) {
 			err := os.Mkdir(filepath.Join(downloadLocation, torrent.Name), 0755)
@@ -275,7 +273,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 			// create the nested directories
 			path := filepath.Join(downloadLocation, torrent.Name)
 			for _, f := range file.Path[:len(file.Path)-1] {
-				path = filepath.Join(path, f) 
+				path = filepath.Join(path, f)
 			}
 
 			if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -284,7 +282,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 					fmt.Printf(Red+"%v"+Reset, err)
 				}
 			}
-			
+
 			// and then the file
 			f, err := os.Create(filepath.Join(path, file.Path[len(file.Path)-1]))
 			if err != nil {
@@ -314,7 +312,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	// Connect to each peer once
 	var peersUsed []peer.Peer
 
-	SKIP:
+SKIP:
 	for peer := range torrent.Peers {
 		for _, v := range peersUsed {
 			if reflect.DeepEqual(v, *peer) {
@@ -330,9 +328,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 
 	donePieces := 0
 
-	newPieces := 0    	
-    start := time.Now()
-	
+	newPieces := 0
+	start := time.Now()
+
 	var rate float64
 	var oldRate float64
 
@@ -342,14 +340,14 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		donePieces++
 		newPieces++
 
-		if time.Since(start).Seconds()>1 {
+		if time.Since(start).Seconds() > 1 {
 			oldRate = rate
 			rate = float64(newPieces) * float64(torrent.PieceLength) / time.Since(start).Seconds()
 			rate = (rate + oldRate) / 2
-			if (rate/1024 < 20) {
-				maxBacklog = int(rate/1024 + 2);
+			if rate/1024 < 20 {
+				maxBacklog = int(rate/1024 + 2)
 			} else {
-				maxBacklog = int(rate/1024/5 + 18);
+				maxBacklog = int(rate/1024/5 + 18)
 			}
 			newPieces = 0
 			start = time.Now()
@@ -374,33 +372,31 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
 
 		print("\r")
-		for i := 0; i <= 100; i++ {
-			print(" ")
-		}
+		print(strings.Repeat(" ", 101))
 
 		percentStr := fmt.Sprintf("%0.2f", percent)
 
 		print(Cyan + "\r▕" + Reset)
 		for i := 0; i <= 50; i++ {
-			if(i <= int(percent)/2) {
+			if i <= int(percent)/2 {
 				print(CyanB)
 			}
 			print(White)
 
-			if(i<22 || i>27) {
+			if i < 22 || i > 27 {
 				print(" ")
 			} else {
-				if(i==22) {
+				if i == 22 {
 					fmt.Printf("%c", percentStr[0])
-				} else if(i==23) {
+				} else if i == 23 {
 					fmt.Printf("%c", percentStr[1])
-				} else if(i==24) {
+				} else if i == 24 {
 					fmt.Printf("%c", percentStr[2])
-				} else if(i==25) {
+				} else if i == 25 {
 					fmt.Printf("%c", percentStr[3])
-				} else if(i==26) && len(percentStr)>4 {
+				} else if (i == 26) && len(percentStr) > 4 {
 					fmt.Printf("%c", percentStr[4])
-				} else if(i==27) {
+				} else if i == 27 {
 					print("%")
 				}
 			}
@@ -409,14 +405,14 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		print(Cyan + "▏ " + Reset)
 
 		var eta string
-		if(rate==0) {
+		if rate == 0 {
 			eta = "∞"
 		} else {
-			eta = secondsToHuman((torrent.Length-res.index*torrent.PieceLength+torrent.PieceLength)/int(rate))
+			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + torrent.PieceLength) / int(rate))
 		}
 
 		status := fmt.Sprintf("#%s | %d (%s) | %v/s | %s",
-			Green + strconv.Itoa(res.index) + Reset, numPieces - donePieces,
+			Green+strconv.Itoa(res.index)+Reset, numPieces-donePieces,
 			ByteCountIEC(int64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)),
 			ByteCountIEC(int64(rate)), eta)
 
@@ -426,17 +422,15 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	}
 
 	print("\r")
-	for i := 0; i <= 100; i++ {
-		print(" ")
-	}
+	print(strings.Repeat(" ", 101))
 
 	print(Green + "\r▕" + Reset)
 	for i := 0; i <= 50; i++ {
 		print(GreenB)
 		print(White)
-		if(i==22) {
+		if i == 22 {
 			print("100%")
-		} else if(i==23 || i==24 || i ==25 || i==26 || i==27) {
+		} else if i == 23 || i == 24 || i == 25 || i == 26 || i == 27 {
 		} else {
 			print(" ")
 		}
