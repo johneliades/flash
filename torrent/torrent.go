@@ -366,7 +366,47 @@ SKIP:
 				return
 			}
 		} else {
-			//print("\nhad multiple files\n")
+			fileStart := 0
+			fileEnd := 0
+			pieceStart := res.index*torrent.PieceLength
+
+			for i, file := range fileArray {
+				fileEnd = torrent.Files[i].Length + fileStart
+			
+				if(pieceStart>=fileStart && pieceStart<=fileEnd) {
+					//check if piece belongs in this file
+
+					_, err := file.Seek(int64(pieceStart-fileStart), 0)
+					if err != nil {
+						fmt.Printf(Red+"%v"+Reset, err)
+						return
+					}
+
+					if(pieceStart + torrent.PieceLength <= fileEnd) {
+						// piece belongs in this file
+
+						bytesWritten, err := file.Write(res.buf)
+						if err != nil || bytesWritten != len(res.buf) {
+							fmt.Printf(Red+"%v"+Reset, err)
+							return
+						}
+
+					} else {
+						// part of piece belongs in next file
+
+						bytesWritten, err := file.Write(res.buf[0:fileEnd-pieceStart])
+						if err != nil || bytesWritten != len(res.buf[0:fileEnd-pieceStart]) {
+							fmt.Printf(Red+"%v"+Reset, err.Error())
+							return
+						}
+
+						res.buf = res.buf[fileEnd-pieceStart:len(res.buf)]
+						pieceStart = fileEnd
+					}
+				}
+
+				fileStart = fileEnd
+			}
 		}
 
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
