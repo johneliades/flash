@@ -347,7 +347,7 @@ SKIP:
 			if rate/1024 < 20 {
 				maxBacklog = int(rate/1024 + 2)
 			} else {
-				maxBacklog = int(rate/1024/5 + 18)
+				maxBacklog = int(rate/1024/4 + 18)
 			}
 			newPieces = 0
 			start = time.Now()
@@ -382,7 +382,7 @@ SKIP:
 						return
 					}
 
-					if(pieceStart + torrent.PieceLength <= fileEnd) {
+					if(pieceStart + len(res.buf) <= fileEnd) {
 						// piece belongs in this file
 
 						bytesWritten, err := file.Write(res.buf)
@@ -390,7 +390,6 @@ SKIP:
 							fmt.Printf(Red+"%v"+Reset, err)
 							return
 						}
-
 					} else {
 						// part of piece belongs in next file
 
@@ -448,7 +447,7 @@ SKIP:
 		if rate == 0 {
 			eta = "∞"
 		} else {
-			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + torrent.PieceLength) / int(rate))
+			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + len(res.buf)) / int(rate))
 		}
 
 		status := fmt.Sprintf("#%s | %d (%s) | %v/s | %s",
