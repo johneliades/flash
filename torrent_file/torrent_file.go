@@ -1,6 +1,7 @@
 package torrent_file
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
@@ -249,10 +250,14 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 			return
 		}
 
-		// Wrong cause it blocks if there are less than 10 clients
+		// Wrong cause it blocks if there are less than 15 clients
 		// and ignores the rest if there are more
-		buf_res = make([]byte, 20+15*6) // 20 header and 10 clients of 6 bytes each
-		ok = binary.Read(conn, binary.BigEndian, &buf_res)
+		//buf_res = make([]byte, 20+15*6)
+		//ok = binary.Read(conn, binary.BigEndian, &buf_res)
+		//but uses big endian
+
+		buf_res = make([]byte, 20+30*6) // 20 header and 30 clients of 6 bytes each
+		_, ok = bufio.NewReader(conn).Read(buf_res)
 		if ok != nil {
 			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
 			return

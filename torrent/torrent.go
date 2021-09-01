@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -347,7 +348,7 @@ SKIP:
 			if rate/1024 < 20 {
 				maxBacklog = int(rate/1024 + 2)
 			} else {
-				maxBacklog = int(rate/1024/4 + 18)
+				maxBacklog = int(rate/1024/5 + 18)
 			}
 			newPieces = 0
 			start = time.Now()
@@ -368,12 +369,12 @@ SKIP:
 		} else {
 			fileStart := 0
 			fileEnd := 0
-			pieceStart := res.index*torrent.PieceLength
+			pieceStart := res.index * torrent.PieceLength
 
 			for i, file := range fileArray {
 				fileEnd = torrent.Files[i].Length + fileStart
-			
-				if(pieceStart>=fileStart && pieceStart<=fileEnd) {
+
+				if pieceStart >= fileStart && pieceStart <= fileEnd {
 					//check if piece belongs in this file
 
 					_, err := file.Seek(int64(pieceStart-fileStart), 0)
@@ -382,7 +383,7 @@ SKIP:
 						return
 					}
 
-					if(pieceStart + len(res.buf) <= fileEnd) {
+					if pieceStart+len(res.buf) <= fileEnd {
 						// piece belongs in this file
 
 						bytesWritten, err := file.Write(res.buf)
@@ -393,13 +394,13 @@ SKIP:
 					} else {
 						// part of piece belongs in next file
 
-						bytesWritten, err := file.Write(res.buf[0:fileEnd-pieceStart])
+						bytesWritten, err := file.Write(res.buf[0 : fileEnd-pieceStart])
 						if err != nil || bytesWritten != len(res.buf[0:fileEnd-pieceStart]) {
 							fmt.Printf(Red+"%v"+Reset, err.Error())
 							return
 						}
 
-						res.buf = res.buf[fileEnd-pieceStart:len(res.buf)]
+						res.buf = res.buf[fileEnd-pieceStart : len(res.buf)]
 						pieceStart = fileEnd
 					}
 				}
@@ -450,7 +451,7 @@ SKIP:
 			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + len(res.buf)) / int(rate))
 		}
 
-		status := fmt.Sprintf("#%s | %d (%s) | %v/s | %s",
+		status := fmt.Sprintf("%v | #%s | %d (%s) | %v/s | %s", runtime.NumGoroutine()-1,
 			Green+strconv.Itoa(res.index)+Reset, numPieces-donePieces,
 			ByteCountIEC(int64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)),
 			ByteCountIEC(int64(rate)), eta)
