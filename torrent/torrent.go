@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -157,6 +156,8 @@ func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, res
 		if(Debug) {
 			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String(false) + Red + " - " + err.Error() + Reset)
 		}
+		results <- &pieceResult{-1, []byte(""), peer.String(false)}
+
 		return
 	}
 
@@ -534,7 +535,7 @@ SKIP:
 			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + len(res.buf)) / int(rate))
 		}
 
-		status := fmt.Sprintf("%v | #%s | %d (%s) | %v/s | %s", runtime.NumGoroutine()-1,
+		status := fmt.Sprintf("%v | #%s | %d (%s) | %v/s | %s", len(peersUsed),
 			Green+strconv.Itoa(res.index)+Reset, numPieces-donePieces,
 			ByteCountIEC(int64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)),
 			ByteCountIEC(int64(rate)), eta)
