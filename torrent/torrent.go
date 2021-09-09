@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+var Debug = false
+
 const (
 	Reset  = "\033[0m"
 	Black  = "\033[30m"
@@ -145,10 +147,14 @@ var statusLen int = 0
 func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
 	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
 
-	if err == nil {
-		println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() + " - " + Green + "Success" + Reset)
-	} else {
-		println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() + Red + " - " + err.Error() + Reset)
+	if err == nil{
+		if(Debug) {
+			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() + " - " + Green + "Success" + Reset)
+		}
+	} else{
+		if(Debug) {
+			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() + Red + " - " + err.Error() + Reset)
+		}
 		return
 	}
 
@@ -163,8 +169,10 @@ func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, res
 
 		buf, err := getPiece(c, pw)
 		if err != nil {
-			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() +
-				Red + " - exiting: " + err.Error() + Reset)
+			if Debug {
+				println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String() +
+					Red + " - exiting: " + err.Error() + Reset)
+			}
 
 			workQueue <- pw // Put piece back on the queue
 			return
@@ -172,7 +180,9 @@ func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, res
 
 		hash := sha1.Sum(buf)
 		if !bytes.Equal(hash[:], pw.hash[:]) {
-			fmt.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
+			if Debug {
+				fmt.Printf(Red+"Piece #%d failed integrity check, retrying.\n"+Reset, pw.index)
+			}
 			workQueue <- pw // Put piece back on the queue
 			continue
 		}
@@ -245,7 +255,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	if _, err := os.Stat(downloadLocation); os.IsNotExist(err) {
 		err = os.Mkdir(downloadLocation, 0755)
 		if err != nil {
-			fmt.Printf(Red+"%v"+Reset, err)
+			if Debug {
+				fmt.Printf(Red+"%v"+Reset, err)
+			}
 		}
 	}
 
@@ -253,7 +265,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		// Single file in torrent
 		f, err := os.Create(filepath.Join(downloadLocation, torrent.Name))
 		if err != nil {
-			fmt.Printf(Red+"%v"+Reset, err)
+			if Debug {
+				fmt.Printf(Red+"%v"+Reset, err)
+			}
 			return
 		}
 		fileSingle = *f
@@ -265,7 +279,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		if _, err := os.Stat(filepath.Join(downloadLocation, torrent.Name)); os.IsNotExist(err) {
 			err := os.Mkdir(filepath.Join(downloadLocation, torrent.Name), 0755)
 			if err != nil {
-				fmt.Printf(Red+"%v"+Reset, err)
+				if Debug {
+					fmt.Printf(Red+"%v"+Reset, err)
+				}
 			}
 		}
 
@@ -280,7 +296,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 			if _, err := os.Stat(path); os.IsNotExist(err) {
 				err := os.MkdirAll(path, 0755)
 				if err != nil {
-					fmt.Printf(Red+"%v"+Reset, err)
+					if Debug {
+						fmt.Printf(Red+"%v"+Reset, err)
+					}
 				}
 			}
 
@@ -325,7 +343,7 @@ SKIP:
 		peersUsed = append(peersUsed, *peer)
 	}
 
-	println("\r" + Green + "Download started" + Reset)
+	println("\r" + Green + "Download started: " + Reset + torrent.Name)
 
 	donePieces := 0
 
@@ -357,13 +375,17 @@ SKIP:
 		if len(torrent.Files) == 0 {
 			_, err := fileSingle.Seek(int64(res.index*torrent.PieceLength), 0)
 			if err != nil {
-				fmt.Printf(Red+"%v"+Reset, err)
+				if Debug {
+					fmt.Printf(Red+"%v"+Reset, err)
+				}
 				return
 			}
 
 			bytesWritten, err := fileSingle.Write(res.buf)
 			if err != nil || bytesWritten != len(res.buf) {
-				fmt.Printf(Red+"%v"+Reset, err)
+				if Debug {
+					fmt.Printf(Red+"%v"+Reset, err)
+				}
 				return
 			}
 		} else {
@@ -379,7 +401,9 @@ SKIP:
 
 					_, err := file.Seek(int64(pieceStart-fileStart), 0)
 					if err != nil {
-						fmt.Printf(Red+"%v"+Reset, err)
+						if Debug {
+							fmt.Printf(Red+"%v"+Reset, err)
+						}
 						return
 					}
 
@@ -388,7 +412,9 @@ SKIP:
 
 						bytesWritten, err := file.Write(res.buf)
 						if err != nil || bytesWritten != len(res.buf) {
-							fmt.Printf(Red+"%v"+Reset, err)
+							if Debug {
+								fmt.Printf(Red+"%v"+Reset, err)
+							}
 							return
 						}
 					} else {
@@ -396,7 +422,9 @@ SKIP:
 
 						bytesWritten, err := file.Write(res.buf[0 : fileEnd-pieceStart])
 						if err != nil || bytesWritten != len(res.buf[0:fileEnd-pieceStart]) {
-							fmt.Printf(Red+"%v"+Reset, err.Error())
+							if Debug {
+								fmt.Printf(Red+"%v"+Reset, err.Error())
+							}
 							return
 						}
 

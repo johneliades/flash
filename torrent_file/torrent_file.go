@@ -116,7 +116,7 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 	return t
 }
 
-func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *sync.WaitGroup,
+func (t *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *sync.WaitGroup,
 	peerID string, port int) {
 
 	var body []byte
@@ -128,18 +128,20 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 
 		base, ok := url.Parse(tracker)
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
 		params := url.Values{}
-		params.Add("info_hash", string(torrent.infoHash[:]))
+		params.Add("info_hash", string(t.infoHash[:]))
 		// peer_id must be 20 bytes
 		params.Add("peer_id", peerID)
 		params.Add("port", strconv.Itoa(port))
 		params.Add("uploaded", "0")
 		params.Add("downloaded", "0")
-		params.Add("left", strconv.Itoa(torrent.length))
+		params.Add("left", strconv.Itoa(t.length))
 		params.Add("compact", "1")
 
 		base.RawQuery = params.Encode()
@@ -148,7 +150,9 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 
 		resp, ok := http.Get(base.String())
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -156,13 +160,17 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 
 		body, ok = io.ReadAll(resp.Body)
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
 		data, ok := bencode.Decode(bytes.NewReader(body[:]))
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -175,7 +183,9 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 			for _, peer := range peer.Deserialize([]byte(data["peers"].(string))) {
 				peers <- &peer
 			}
-			println("\rTrying tracker: " + tracker + " - " + Green + "Success" + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Green + "Success" + Reset)
+			}
 			return
 		}
 	} else if strings.HasPrefix(tracker, "udp") {
@@ -185,7 +195,9 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 
 		conn, ok := net.Dial("udp", tracker[len("udp://"):len(tracker)-len("/announce")])
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -200,7 +212,9 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 		binary.BigEndian.PutUint32(buf[12:], uint32(transaction))
 		_, ok = conn.Write(buf)
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -208,19 +222,25 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 
 		ok = binary.Read(conn, binary.BigEndian, &buf_res)
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
 		action := binary.BigEndian.Uint32(buf_res[:4])
 		if action != 0 {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
 		transaction_id := binary.BigEndian.Uint32(buf_res[4:8])
 		if transaction != transaction_id {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -233,10 +253,10 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 		binary.BigEndian.PutUint64(buf, connection_id)
 		binary.BigEndian.PutUint32(buf[8:], uint32(1))
 		binary.BigEndian.PutUint32(buf[12:], uint32(transaction))
-		copy(buf[16:], torrent.infoHash[:])
+		copy(buf[16:], t.infoHash[:])
 		copy(buf[36:], peerID[:])
 		binary.BigEndian.PutUint64(buf[56:], 0)
-		binary.BigEndian.PutUint64(buf[64:], uint64(torrent.length))
+		binary.BigEndian.PutUint64(buf[64:], uint64(t.length))
 		binary.BigEndian.PutUint64(buf[72:], 0)
 		binary.BigEndian.PutUint32(buf[80:], 0)
 		binary.BigEndian.PutUint32(buf[84:], 0)
@@ -246,7 +266,9 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 
 		_, ok = conn.Write(buf)
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -259,19 +281,25 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 		buf_res = make([]byte, 20+30*6) // 20 header and 30 clients of 6 bytes each
 		_, ok = bufio.NewReader(conn).Read(buf_res)
 		if ok != nil {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
 		action = binary.BigEndian.Uint32(buf_res[:4])
 		if action != 1 {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
 		transaction_id = binary.BigEndian.Uint32(buf_res[4:8])
 		if transaction != transaction_id {
-			println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			if torrent.Debug {
+				println("\rTrying tracker: " + tracker + " - " + Red + ok.Error() + Reset)
+			}
 			return
 		}
 
@@ -288,18 +316,24 @@ func (torrent *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *
 		for _, peer := range peer.Deserialize(buf_res) {
 			peers <- &peer
 		}
-		println("\rTrying tracker: " + tracker + " - " + Green + "Success" + Reset)
+		if torrent.Debug {
+			println("\rTrying tracker: " + tracker + " - " + Green + "Success" + Reset)
+		}
 		return
 	}
 
-	println("\rTrying tracker: " + tracker + " - " + Red + "Faulty tracker" + Reset)
+	if torrent.Debug {
+		println("\rTrying tracker: " + tracker + " - " + Red + "Faulty tracker" + Reset)
+	}
 }
 
-func Open(path string) (torrent.Torrent, error) {
+func Open(path string, debug bool) (torrent.Torrent, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return torrent.Torrent{}, err
 	}
+
+	torrent.Debug = debug
 
 	rand.Seed(time.Now().UnixNano())
 	var peerID [20]byte
