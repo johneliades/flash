@@ -148,12 +148,12 @@ var statusLen int = 0
 func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
 	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
 
-	if err == nil{
-		if(Debug) {
+	if err == nil {
+		if Debug {
 			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String(false) + " - " + Green + "Success" + Reset)
 		}
-	} else{
-		if(Debug) {
+	} else {
+		if Debug {
 			println("\r" + strings.Repeat(" ", 50+2+statusLen) + "\r" + peer.String(false) + Red + " - " + err.Error() + Reset)
 		}
 		results <- &pieceResult{-1, []byte(""), peer.String(false)}
@@ -252,7 +252,7 @@ func secondsToHuman(input int) (result string) {
 	return
 }
 
-func findSlice(s []peer.Peer, key string) (int) {
+func findSlice(s []peer.Peer, key string) int {
 	for i, v := range s {
 		if v.String(false) == key {
 			return i
@@ -263,7 +263,7 @@ func findSlice(s []peer.Peer, key string) (int) {
 }
 
 func removeIndex(s []peer.Peer, index int) []peer.Peer {
-    return append(s[:index], s[index+1:]...)
+	return append(s[:index], s[index+1:]...)
 }
 
 func (torrent *Torrent) Download(downloadLocation string) {
@@ -337,10 +337,10 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		reader := bufio.NewReader(os.Stdin)
 		for {
 			s, err := reader.ReadString('\n')
-		if err != nil { // Maybe log non io.EOF errors, if you want
-			close(ch)
-			return
-		}
+			if err != nil { // Maybe log non io.EOF errors, if you want
+				close(ch)
+				return
+			}
 			ch <- s
 		}
 		close(ch)
@@ -387,7 +387,7 @@ SKIP:
 
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
-		if(res.index==-1) {
+		if res.index == -1 {
 			peersUsed = removeIndex(peersUsed, findSlice(peersUsed, res.error))
 			continue
 		}
@@ -476,23 +476,23 @@ SKIP:
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
 
 		select {
-			case stdin, ok := <-ch:
-				if ok {
-					print("\r")
-					print(strings.Repeat(" ", 101))
-					if(string([]byte(stdin)[0])=="P" || string([]byte(stdin)[0])=="p") {
-						fmt.Print("\n" + Green + "Active Peers: [" + Reset)
-						for i, v := range peersUsed {
-							fmt.Printf("%v", v.String(true))
-							if(i<len(peersUsed)-1) {
-								print(" ")
-							}
+		case stdin, ok := <-ch:
+			if ok {
+				print("\r")
+				print(strings.Repeat(" ", 101))
+				if string([]byte(stdin)[0]) == "P" || string([]byte(stdin)[0]) == "p" {
+					fmt.Print("\n" + Green + "Active Peers: [" + Reset)
+					for i, v := range peersUsed {
+						fmt.Printf("%v", v.String(true))
+						if i < len(peersUsed)-1 {
+							print(" ")
 						}
-						println(Green + "]" + Reset + "\n")
 					}
+					println(Green + "]" + Reset + "\n")
 				}
-			case <-time.After(10 * time.Millisecond):
-				break
+			}
+		case <-time.After(10 * time.Millisecond):
+			break
 		}
 
 		print("\r")

@@ -34,9 +34,9 @@ func Deserialize(peersBinary []byte) []Peer {
 }
 
 func (peer Peer) String(iponly bool) string {
-	if(iponly) {
+	if iponly {
 		return peer.ip.String()
 	}
-	
+
 	return net.JoinHostPort(peer.ip.String(), strconv.Itoa(int(peer.port)))
 }
