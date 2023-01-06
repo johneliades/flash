@@ -564,6 +564,7 @@ SKIP:
 	for i := 0; i <= 25; i++ {
 		print(" ")
 	}
+	print("\n")
 
 	close(workQueue)
 }
