@@ -29,11 +29,12 @@ files go in.
 By running:
 
 ```
-go mod init [module path]
+go mod init main
 go mod tidy
+go run main.go
 ```
 
-Golang downloads the flash library automatically.
+Golang downloads the flash library automatically and starts the torrent download.
 
 ## Author
 
