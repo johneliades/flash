@@ -11,16 +11,15 @@ Sample main:
 package main
 
 import (
-	"github.com/johneliades/flash/torrent_file"
+	"github.com/johneliades/flash"
 	"fmt"
 )
 
 func main() {
-	torrent, err := torrent_file.Open("torrent_path", false)
+	err := flash.DownloadTorrent("torrent_path", "downloads", false)
 	if err != nil {
 		fmt.Errorf("%v", err)
 	}
-	torrent.Download("downloads")
 }
 ```
 Where "torrent_path" is the path to the .torrent file, "false"  

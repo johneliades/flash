@@ -1,2 +1,4 @@
+github.com/johneliades/flash v0.0.0-20240201200746-fb02003989a3 h1:XaCVuPUDUxwAlsvX3Ut+y7lgWZivIIqxu5CdUncZRrI=
+github.com/johneliades/flash v0.0.0-20240201200746-fb02003989a3/go.mod h1:dchIjb3JPQGUeIsVEAAmRQlP2uxLZQvzQ3D+hNN6DFk=
 github.com/marksamman/bencode v0.0.0-20150821143521-dc84f26e086e h1:KMs6SK8iDSR1+ZzOK10L5wGPpWDByyvOe5nrqk51g2U=
 github.com/marksamman/bencode v0.0.0-20150821143521-dc84f26e086e/go.mod h1:+AHfJo5+69p+fjvMJTmYajNP9rFBHQcaTDFmuXRRATI=
