@@ -22,9 +22,9 @@ func main() {
 	}
 }
 ```
-Where "torrent_path" is the path to the .torrent file, "false"  
-deactivates the debugging information and "downloads" is the name 
-of the folder the downloaded files go in.
+Where "torrent_path" is the path to the .torrent file, "false" deactivates the 
+debugging information and "downloads" is the name of the folder the downloaded 
+files go in.
 
 By running:
 
