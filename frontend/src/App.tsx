@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { toast, ToastContainer } from "react-toastify"; // Import toast
 import TorrentTable from "./components/TorrentTable";
 import FileInput from "./components/FileInput";
-import { Torrent } from "./interface/Torrent";
+import { TorrentStatus } from "./interface/Torrent";
 
 function App() {
-  const [torrents, setTorrents] = useState<Torrent[]>([]);
+  const [torrents, setTorrents] = useState<TorrentStatus[]>([]);
 
   // Create a ref to store the latest torrents state
-  const torrentsRef = useRef<Torrent[]>(torrents);
+  const torrentsRef = useRef<TorrentStatus[]>(torrents);
 
   // Sync ref with state on each render
   useEffect(() => {
@@ -36,7 +36,7 @@ function App() {
   };
 
   const addTorrent = (file: File) => {
-    const newTorrent: Torrent = {
+    const newTorrent: TorrentStatus = {
       name: file.name,
       progress: 0,
       downloadSpeed: 0,
@@ -55,7 +55,7 @@ function App() {
           );
 
           if (response.ok) {
-            const progressData: Torrent = await response.json();
+            const progressData: TorrentStatus = await response.json();
             // console.log(progressData);
 
             if (progressData.progress === 100) {

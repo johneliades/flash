@@ -373,7 +373,7 @@ func Open(path string, debug bool, data ...[]byte) (torrent.Torrent, error) {
         close(peers)
     }()
 
-    return torrent.Torrent{
+	torrentMeta := torrent.TorrentMeta{
         Peers:       peers,
         PeerID:      peerID,
         InfoHash:    t.infoHash,
@@ -382,5 +382,16 @@ func Open(path string, debug bool, data ...[]byte) (torrent.Torrent, error) {
         Length:      t.length,
         Name:        t.name,
         Files:       t.files,
-    }, nil
+	}
+
+	torrentStatus := torrent.TorrentStatus{
+		Progress:   0.0,
+		DownSpeed:  0.0,
+		Size:       0.0,
+	}
+
+	return torrent.Torrent{
+		Meta:   torrentMeta,
+		Status: torrentStatus,
+	}, nil
 }

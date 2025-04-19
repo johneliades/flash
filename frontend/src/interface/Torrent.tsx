@@ -1,4 +1,4 @@
-export interface Torrent {
+export interface TorrentStatus {
   name: string;
   progress: number;
   downloadSpeed: number;

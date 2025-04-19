@@ -11,11 +11,11 @@ const TorrentTable: React.FC<TorrentTableProps> = ({ torrents }) => {
     <table className="table table-sm table-hover">
       <thead>
         <tr>
-          <th style={{ width: "35%", textAlign: "center" }}>Torrent</th>
-          <th style={{ width: "35%", textAlign: "center" }}>Progress</th>
-          <th style={{ width: "10%", textAlign: "center" }}>Down</th>
-          <th style={{ width: "10%", textAlign: "center" }}>Size</th>
-          <th style={{ width: "10%", textAlign: "center" }}>ETA</th>
+          <th style={{ width: "33.3%", textAlign: "center" }}>Torrent</th>
+          <th style={{ width: "33.3%", textAlign: "center" }}>Progress</th>
+          <th style={{ width: "11.3%", textAlign: "center" }}>Down</th>
+          <th style={{ width: "11.3%", textAlign: "center" }}>Size</th>
+          <th style={{ width: "11.3%", textAlign: "center" }}>ETA</th>
         </tr>
       </thead>
       <tbody>

@@ -1,8 +1,8 @@
 import React from "react";
-import { Torrent } from "../interface/Torrent"; 
+import { TorrentStatus } from "../interface/Torrent"; 
 
 interface TorrentRowProps {
-  torrent: Torrent;
+  torrent: TorrentStatus;
 }
 
 function formatBytes(bytes: number): string {
@@ -75,7 +75,7 @@ const TorrentRow: React.FC<TorrentRowProps> = ({ torrent }) => {
           style={{
             height: "20px",
             position: "relative",
-            border: "1px solid black", // Add a black border here
+            border: "1.5px solid black", // Add a black border here
           }}
         >
           <div

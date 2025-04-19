@@ -11,10 +11,10 @@ import (
 	"github.com/johneliades/flash/torrent_file"
 )
 
-var activeTorrents map[string]*torrent.Torrent
+var activeTorrents map[string]*torrent.TorrentStatus
 
 func RegisterRoutes(r *gin.Engine) {
-	activeTorrents = make(map[string]*torrent.Torrent)
+	activeTorrents = make(map[string]*torrent.TorrentStatus)
 
 	r.POST("/start-download", func(c *gin.Context) {
 		file, err := c.FormFile("torrent")
@@ -44,7 +44,7 @@ func RegisterRoutes(r *gin.Engine) {
 			return
 		}
 
-		activeTorrents[file.Filename] = &torrent
+		activeTorrents[file.Filename] = &torrent.Status
 		torrent.Download("") 
 
 		c.JSON(http.StatusOK, gin.H{"message": "Download started"})

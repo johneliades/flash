@@ -46,7 +46,7 @@ type File struct {
 	Path   []string
 }
 
-type Torrent struct {
+type TorrentMeta struct {
 	Peers       chan *peer.Peer
 	PeerID      [20]byte
 	InfoHash    [20]byte
@@ -55,9 +55,17 @@ type Torrent struct {
 	Length      int
 	Name        string
 	Files       []File
-	Progress	float64
-	DownSpeed	float64
-	Size		float64
+}
+
+type TorrentStatus struct {
+	Progress   float64
+	DownSpeed  float64
+	Size       float64
+}
+
+type Torrent struct {
+	Meta   TorrentMeta
+	Status TorrentStatus
 }
 
 type pieceWork struct {
@@ -150,7 +158,7 @@ func getPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
 var statusLen int = 0
 
 func (torrent *Torrent) startPeer(peer peer.Peer, workQueue chan *pieceWork, results chan *pieceResult) {
-	c, err := client.New(peer, torrent.PeerID, torrent.InfoHash)
+	c, err := client.New(peer, torrent.Meta.PeerID, torrent.Meta.InfoHash )
 
 	if err == nil {
 		if Debug {
@@ -283,9 +291,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		}
 	}
 
-	if len(torrent.Files) == 0 {
+	if len(torrent.Meta.Files) == 0 {
 		// Single file in torrent
-		f, err := os.Create(filepath.Join(downloadLocation, torrent.Name))
+		f, err := os.Create(filepath.Join(downloadLocation, torrent.Meta.Name))
 		if err != nil {
 			if Debug {
 				fmt.Printf(Red+"%v"+Reset, err)
@@ -298,8 +306,8 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		// Multiple files in torrent
 
 		// Creation of core directory
-		if _, err := os.Stat(filepath.Join(downloadLocation, torrent.Name)); os.IsNotExist(err) {
-			err := os.Mkdir(filepath.Join(downloadLocation, torrent.Name), 0755)
+		if _, err := os.Stat(filepath.Join(downloadLocation, torrent.Meta.Name)); os.IsNotExist(err) {
+			err := os.Mkdir(filepath.Join(downloadLocation, torrent.Meta.Name), 0755)
 			if err != nil {
 				if Debug {
 					fmt.Printf(Red+"%v"+Reset, err)
@@ -308,9 +316,9 @@ func (torrent *Torrent) Download(downloadLocation string) {
 		}
 
 		// Get each "file" in the torrent
-		for _, file := range torrent.Files {
+		for _, file := range torrent.Meta.Files {
 			// create the nested directories
-			path := filepath.Join(downloadLocation, torrent.Name)
+			path := filepath.Join(downloadLocation, torrent.Meta.Name)
 			for _, f := range file.Path[:len(file.Path)-1] {
 				path = filepath.Join(path, f)
 			}
@@ -352,13 +360,13 @@ func (torrent *Torrent) Download(downloadLocation string) {
 
 	numPieces := 0
 
-	workQueue := make(chan *pieceWork, len(torrent.PieceHashes))
+	workQueue := make(chan *pieceWork, len(torrent.Meta.PieceHashes))
 	results := make(chan *pieceResult)
-	for index, hash := range torrent.PieceHashes {
-		begin := index * torrent.PieceLength
-		end := begin + torrent.PieceLength
-		if end > torrent.Length {
-			end = torrent.Length
+	for index, hash := range torrent.Meta.PieceHashes {
+		begin := index * torrent.Meta.PieceLength
+		end := begin + torrent.Meta.PieceLength
+		if end > torrent.Meta.Length {
+			end = torrent.Meta.Length
 		}
 		numPieces++
 		workQueue <- &pieceWork{index, hash, end - begin}
@@ -368,7 +376,7 @@ func (torrent *Torrent) Download(downloadLocation string) {
 	var peersUsed []peer.Peer
 
 SKIP:
-	for peer := range torrent.Peers {
+	for peer := range torrent.Meta.Peers {
 		for _, v := range peersUsed {
 			if reflect.DeepEqual(v, *peer) {
 				continue SKIP
@@ -379,7 +387,7 @@ SKIP:
 		peersUsed = append(peersUsed, *peer)
 	}
 
-	println("\r" + Green + "Download started: " + Reset + torrent.Name)
+	println("\r" + Green + "Download started: " + Reset + torrent.Meta.Name)
 
 	newPieces := 0
 	start := time.Now()
@@ -388,7 +396,7 @@ SKIP:
 	var oldRate float64
 
 	donePieces := 0
-	for donePieces < len(torrent.PieceHashes) {
+	for donePieces < len(torrent.Meta.PieceHashes) {
 		res := <-results
 		if res.index == -1 {
 			peersUsed = removeIndex(peersUsed, findSlice(peersUsed, res.error))
@@ -400,7 +408,7 @@ SKIP:
 
 		if time.Since(start).Seconds() > 1 {
 			oldRate = rate
-			rate = float64(newPieces) * float64(torrent.PieceLength) / time.Since(start).Seconds()
+			rate = float64(newPieces) * float64(torrent.Meta.PieceLength) / time.Since(start).Seconds()
 			rate = (rate + oldRate) / 2
 			if rate/1024 < 20 {
 				maxBacklog = int(rate/1024 + 2)
@@ -411,8 +419,8 @@ SKIP:
 			start = time.Now()
 		}
 
-		if len(torrent.Files) == 0 {
-			_, err := fileSingle.Seek(int64(res.index*torrent.PieceLength), 0)
+		if len(torrent.Meta.Files) == 0 {
+			_, err := fileSingle.Seek(int64(res.index*torrent.Meta.PieceLength), 0)
 			if err != nil {
 				if Debug {
 					fmt.Printf(Red+"%v"+Reset, err)
@@ -430,10 +438,10 @@ SKIP:
 		} else {
 			fileStart := 0
 			fileEnd := 0
-			pieceStart := res.index * torrent.PieceLength
+			pieceStart := res.index * torrent.Meta.PieceLength
 
 			for i, file := range fileArray {
-				fileEnd = torrent.Files[i].Length + fileStart
+				fileEnd = torrent.Meta.Files[i].Length + fileStart
 
 				if pieceStart >= fileStart && pieceStart <= fileEnd {
 					//check if piece belongs in this file
@@ -476,8 +484,8 @@ SKIP:
 			}
 		}
 
-		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
-		torrent.Progress = percent
+		percent := float64(donePieces) / float64(len(torrent.Meta.PieceHashes)) * 100
+		torrent.Status.Progress = percent
 
 		select {
 		case stdin, ok := <-ch:
@@ -536,15 +544,15 @@ SKIP:
 		if rate == 0 {
 			eta = "∞"
 		} else {
-			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + len(res.buf)) / int(rate))
+			eta = secondsToHuman((torrent.Meta.Length - res.index*torrent.Meta.PieceLength + len(res.buf)) / int(rate))
 		}
 
-		torrent.DownSpeed = float64(rate)
-		torrent.Size = float64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)
+		torrent.Status.DownSpeed = float64(rate)
+		torrent.Status.Size = float64(torrent.Meta.Length-donePieces*torrent.Meta.PieceLength+torrent.Meta.PieceLength)
 
 		status := fmt.Sprintf("%v | #%s | %d (%s) | %v/s | %s", len(peersUsed),
 			Green+strconv.Itoa(res.index)+Reset, numPieces-donePieces,
-			ByteCountIEC(int64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)),
+			ByteCountIEC(int64(torrent.Meta.Length-donePieces*torrent.Meta.PieceLength+torrent.Meta.PieceLength)),
 			ByteCountIEC(int64(rate)), eta)
 
 		print(status)
