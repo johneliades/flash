@@ -5,9 +5,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
-	"github.com/johneliades/flash/client"
-	"github.com/johneliades/flash/message"
-	"github.com/johneliades/flash/peer"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/johneliades/flash/client"
+	"github.com/johneliades/flash/message"
+	"github.com/johneliades/flash/peer"
 )
 
 var Debug = false
@@ -54,6 +55,9 @@ type Torrent struct {
 	Length      int
 	Name        string
 	Files       []File
+	Progress	float64
+	DownSpeed	float64
+	Size		float64
 }
 
 type pieceWork struct {
@@ -377,14 +381,13 @@ SKIP:
 
 	println("\r" + Green + "Download started: " + Reset + torrent.Name)
 
-	donePieces := 0
-
 	newPieces := 0
 	start := time.Now()
 
 	var rate float64
 	var oldRate float64
 
+	donePieces := 0
 	for donePieces < len(torrent.PieceHashes) {
 		res := <-results
 		if res.index == -1 {
@@ -474,6 +477,7 @@ SKIP:
 		}
 
 		percent := float64(donePieces) / float64(len(torrent.PieceHashes)) * 100
+		torrent.Progress = percent
 
 		select {
 		case stdin, ok := <-ch:
@@ -534,6 +538,9 @@ SKIP:
 		} else {
 			eta = secondsToHuman((torrent.Length - res.index*torrent.PieceLength + len(res.buf)) / int(rate))
 		}
+
+		torrent.DownSpeed = float64(rate)
+		torrent.Size = float64(torrent.Length-donePieces*torrent.PieceLength+torrent.PieceLength)
 
 		status := fmt.Sprintf("%v | #%s | %d (%s) | %v/s | %s", len(peersUsed),
 			Green+strconv.Itoa(res.index)+Reset, numPieces-donePieces,

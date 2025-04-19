@@ -5,9 +5,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"github.com/johneliades/flash/peer"
-	"github.com/johneliades/flash/torrent"
-	"github.com/marksamman/bencode"
 	"io"
 	"math/rand"
 	"net"
@@ -18,6 +15,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/johneliades/flash/peer"
+	"github.com/johneliades/flash/torrent"
+	"github.com/marksamman/bencode"
 )
 
 const (
@@ -56,7 +57,10 @@ func btoTorrentStruct(file_bytes io.Reader) torrentFile {
 		panic(ok)
 	}
 
-	announce := data["announce"].(string)
+	announce := ""
+	if val, ok := data["announce"].(string); ok {
+		announce = val
+	}
 
 	var announceList []string
 	for _, tracker := range data["announce-list"].([]interface{}) {
@@ -327,49 +331,56 @@ func (t *torrentFile) getPeers(tracker string, peers chan *peer.Peer, wg *sync.W
 	}
 }
 
-func Open(path string, debug bool) (torrent.Torrent, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return torrent.Torrent{}, err
-	}
+func Open(path string, debug bool, data ...[]byte) (torrent.Torrent, error) {
+    var reader io.Reader
 
-	torrent.Debug = debug
+    if len(data) > 0 && len(data[0]) > 0 {
+        // If data is passed, use it
+        reader = bytes.NewReader(data[0])
+    } else {
+        // If data is not passed, read from file
+        file, err := os.Open(path)
+        if err != nil {
+            return torrent.Torrent{}, err
+        }
+        defer file.Close()
+        reader = file
+    }
 
-	rand.Seed(time.Now().UnixNano())
-	var peerID [20]byte
-	_, err = rand.Read(peerID[:])
-	if err != nil {
-		return torrent.Torrent{}, err
-	}
+    torrent.Debug = debug
 
-	//	peer_string := "git:johneliades-" + string(peerID[:])
+    rand.Seed(time.Now().UnixNano())
+    var peerID [20]byte
+    _, err := rand.Read(peerID[:])
+    if err != nil {
+        return torrent.Torrent{}, err
+    }
 
-	var tracker string
-	//var peers []peer.Peer
-	peers := make(chan *peer.Peer)
-	wg := &sync.WaitGroup{}
+    var tracker string
+    peers := make(chan *peer.Peer)
+    wg := &sync.WaitGroup{}
 
-	t := btoTorrentStruct(file)
-	for i := 0; i < len(t.announceList); i++ {
-		tracker = t.announceList[i]
+    t := btoTorrentStruct(reader)
+    for i := 0; i < len(t.announceList); i++ {
+        tracker = t.announceList[i]
 
-		wg.Add(1)
-		go t.getPeers(tracker, peers, wg, string(peerID[:]), 3000)
-	}
+        wg.Add(1)
+        go t.getPeers(tracker, peers, wg, string(peerID[:]), 3000)
+    }
 
-	go func() {
-		wg.Wait()
-		close(peers)
-	}()
+    go func() {
+        wg.Wait()
+        close(peers)
+    }()
 
-	return torrent.Torrent{
-		Peers:       peers,
-		PeerID:      peerID,
-		InfoHash:    t.infoHash,
-		PieceHashes: t.pieceHashes,
-		PieceLength: t.pieceLength,
-		Length:      t.length,
-		Name:        t.name,
-		Files:       t.files,
-	}, nil
+    return torrent.Torrent{
+        Peers:       peers,
+        PeerID:      peerID,
+        InfoHash:    t.infoHash,
+        PieceHashes: t.pieceHashes,
+        PieceLength: t.pieceLength,
+        Length:      t.length,
+        Name:        t.name,
+        Files:       t.files,
+    }, nil
 }
